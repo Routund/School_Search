@@ -1,5 +1,7 @@
 from nltk.stem import WordNetLemmatizer
-from re import split
+from string import punctuation
+from urllib import request
+from bs4 import BeautifulSoup
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -8,7 +10,7 @@ from re import split
 # nltk.download('wordnet')
 
 
-def index(text_to_crawl: list) -> list:
+def index(text_to_crawl: list) -> dict:
     # Dictionary to contain frequency of each word in the document
     raw_word_freqs = {
     }
@@ -30,7 +32,21 @@ def index(text_to_crawl: list) -> list:
 
     return word_freqs
 
+def scrape_webpage(url : str):
 
-inp = split(' |,|\n |\.|;|"|-|\'|\'s', input())  # noqa:W605
+    link = request.Request(url)
+    
+    try:
+        response = request.urlopen(link)
+        htmlbytes = response.read()
+        htmlstr = htmlbytes.decode("utf8")
+        soup = BeautifulSoup(htmlstr,"html.parser")
+        str_clean = soup.get_text()
+        print(str_clean)
+        return str_clean
+    except:
+        print("Unable to open page")
 
-index(inp)
+translator = str.maketrans(' ', ' ', punctuation)
+
+inp = scrape_webpage("https://www.burnside.school.nz/").translate(translator).split()
