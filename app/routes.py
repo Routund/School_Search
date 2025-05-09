@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template
+from flask import render_template, redirect
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 
@@ -9,7 +9,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + path.join(basedir,
                                                                  "main.db")
 db.init_app(app)
 
-# import app.models as models
+from app import crawler # noqa
 
 
 @app.route('/')
@@ -33,3 +33,9 @@ def okapi_search(query):
         pass
 
     return list(set_words)
+
+
+@app.route('/insert_docs')
+def insert_docs():
+    crawler.start_scraping_documents(['https://www.burnside.school.nz/enrol/'])
+    return redirect('/')

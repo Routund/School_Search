@@ -5,3 +5,5 @@ app = Flask(__name__)
 from app import routes
 
 app.run(debug=True)
+
+# flake8: noqa

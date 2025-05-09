@@ -7,8 +7,10 @@ class Document(db.Model):
     link = db.Column(db.String())
     title = db.Column(db.String(50))
     intro = db.Column(db.Text())
+    source = db.Column(db.String(50))
 
-    words = db.relationship('KeywordDocument', back_populates='document')
+    words = db.relationship('KeywordDocument', back_populates='Document',
+                            foreign_keys='KeywordDocument.document_id')
 
     def __str__(self):
         return self.title
@@ -20,7 +22,8 @@ class Keyword(db.Model):
     word = db.Column(db.String(30))
     frequency = db.Column(db.Integer)
 
-    documents = db.relationship('KeywordDocument', back_populates='word')
+    Documents = db.relationship('KeywordDocument', back_populates='Word',
+                                foreign_keys='KeywordDocument.word_id')
 
     def __str__(self):
         return self.word
@@ -35,8 +38,8 @@ class KeywordDocument(db.Model):
     word_id = db.Column(db.Integer, db.ForeignKey('Keyword.word_id'),
                         primary_key=True)
 
-    word = db.relationship('Keyword', back_populates='documents')
-    document = db.relationship('Document', back_populates='words')
+    Word = db.relationship('Keyword', back_populates='Documents')
+    Document = db.relationship('Document', back_populates='Words')
 
     def __str__(self):
-        return self.word + ' ' + self.document
+        return self.word_id + ' ' + self.document_id

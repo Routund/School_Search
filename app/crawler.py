@@ -1,13 +1,72 @@
 from nltk.stem import WordNetLemmatizer
-from urllib import request
+from urllib import request, parse
 from bs4 import BeautifulSoup
-
+import threading
+import app.models as models
+from app.routes import db
+from string import punctuation
 
 # need to import wordnet
 # Uncomment lines below when running the first time
 #
 # import nltk
 # nltk.download('wordnet')
+documents_to_parse = []
+problematic = []
+translator = str.maketrans(' ', ' ', punctuation)
+
+
+def scraping_thread():
+    i = 0
+    while i < len(documents_to_parse):
+        url = documents_to_parse[i]
+        # results is list of [text, title, source]
+        result = scrape_webpage(url)
+
+        # Check if error is thrown when trying to fetch info from website
+        if result == 0:
+            problematic.append(url)
+            i += 1
+            continue
+
+        new_document = models.Document()
+        new_document.title = result[1]
+        new_document.source = result[2]
+        new_document.intro = result[0][0:min(len(result[0])-1, 100)] + "..."
+
+        db.session.add(new_document)
+        db.session.commit()
+
+        doc_id = new_document.id
+        dict_words = index(result[0].translate(translator).split())
+
+        for word in dict_words:
+            q = db.session.query(models.Keyword).filter_by(word=word).first()
+            word_id = 0
+            if not bool(q):
+                new_word = models.Keyword()
+                new_word.word = word
+                new_word.frequency = dict_words[word]
+                db.session.add(new_word)
+                db.session.commit()
+                word_id = new_word.word_id
+
+            else:
+                word_id = q.word_id
+                q.frequency = q.frequency + dict_words[word]
+
+            KeywordDocument = models.KeywordDocument()
+            KeywordDocument.document_id = doc_id
+            KeywordDocument.word_id = word_id
+            KeywordDocument.frequency = dict_words[word]
+            db.session.add(KeywordDocument)
+            db.session.commit()
+        i += 1
+
+    documents_to_parse.clear()
+
+
+t1 = threading.Thread(target=scraping_thread)
 
 
 def index(text_to_crawl: list) -> dict:
@@ -40,6 +99,7 @@ def scrape_webpage(url: str):
     try:
         # Get full HTML of a given website
         response = request.urlopen(link)
+        source = parse.urlsplit(url).netloc
         htmlbytes = response.read()
         htmlstr = htmlbytes.decode("utf8")
 
@@ -47,13 +107,18 @@ def scrape_webpage(url: str):
         soup = BeautifulSoup(htmlstr, "html.parser")
         str_clean = soup.get_text()
 
-        return str_clean
+        return (str_clean, soup.title.text, source)
     except Exception as e:
         print("Unable to open page: " + e)
-        return ""
+        return 0
 
 
-# translator = str.maketrans(' ', ' ', punctuation)
+def start_scraping_documents(list_urls: str):
+    documents_to_parse.extend(list_urls)
+    if not t1.is_alive():
+        t1.start()
+    pass
+
 
 # inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision
 # -and-values/").translate(translator).split()
