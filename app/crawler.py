@@ -1,8 +1,7 @@
 from nltk.stem import WordNetLemmatizer
-from string import punctuation
 from urllib import request
 from bs4 import BeautifulSoup
-from re import sub
+
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -33,10 +32,11 @@ def index(text_to_crawl: list) -> dict:
 
     return word_freqs
 
-def scrape_webpage(url : str):
+
+def scrape_webpage(url: str):
 
     link = request.Request(url)
-    
+
     try:
         # Get full HTML of a given website
         response = request.urlopen(link)
@@ -44,17 +44,18 @@ def scrape_webpage(url : str):
         htmlstr = htmlbytes.decode("utf8")
 
         # Take out only the text
-        soup = BeautifulSoup(htmlstr,"html.parser")
+        soup = BeautifulSoup(htmlstr, "html.parser")
         str_clean = soup.get_text()
 
         return str_clean
-    except:
-        print("Unable to open page")
+    except Exception as e:
+        print("Unable to open page: " + e)
         return ""
 
 
 # translator = str.maketrans(' ', ' ', punctuation)
 
-# inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision-and-values/").translate(translator).split()
+# inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision
+# -and-values/").translate(translator).split()
 
 # index(inp)

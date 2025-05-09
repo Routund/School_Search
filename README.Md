@@ -1,6 +1,8 @@
 Search engine for files in the school system
 
 REQUIRED PYTHON PACKAGES:
+flask
+flask-sqlalchemy
 nltk
 pypdf
 bs4
