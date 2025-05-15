@@ -2,6 +2,7 @@ from nltk.stem import WordNetLemmatizer
 from urllib import request, parse
 from bs4 import BeautifulSoup
 import threading
+from app import app
 import app.models as models
 from app.routes import db
 from string import punctuation
@@ -11,6 +12,7 @@ from string import punctuation
 #
 # import nltk
 # nltk.download('wordnet')
+
 documents_to_parse = []
 problematic = []
 translator = str.maketrans(' ', ' ', punctuation)
@@ -29,44 +31,48 @@ def scraping_thread():
             i += 1
             continue
 
-        new_document = models.Document()
-        new_document.title = result[1]
-        new_document.source = result[2]
-        new_document.intro = result[0][0:min(len(result[0])-1, 100)] + "..."
+        with app.app_context():
+            new_document = models.Document()
+            new_document.title = result[1]
+            new_document.source = result[2]
+            new_document.intro = result[0][0:min(len(result[0])-1, 100)] + "..." # noqa
+            new_document.link = url
 
-        db.session.add(new_document)
-        db.session.commit()
-
-        doc_id = new_document.id
-        dict_words = index(result[0].translate(translator).split())
-
-        for word in dict_words:
-            q = db.session.query(models.Keyword).filter_by(word=word).first()
-            word_id = 0
-            if not bool(q):
-                new_word = models.Keyword()
-                new_word.word = word
-                new_word.frequency = dict_words[word]
-                db.session.add(new_word)
-                db.session.commit()
-                word_id = new_word.word_id
-
-            else:
-                word_id = q.word_id
-                q.frequency = q.frequency + dict_words[word]
-
-            KeywordDocument = models.KeywordDocument()
-            KeywordDocument.document_id = doc_id
-            KeywordDocument.word_id = word_id
-            KeywordDocument.frequency = dict_words[word]
-            db.session.add(KeywordDocument)
+            db.session.add(new_document)
             db.session.commit()
+            doc_id = new_document.document_id
+
+            dict_words = index(result[0].translate(translator).split())
+
+            for word in dict_words:
+                q = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
+                word_id = 0
+                if not bool(q):
+                    new_word = models.Keyword()
+                    new_word.word = word
+                    new_word.frequency = dict_words[word]
+                    db.session.add(new_word)
+                    db.session.commit()
+                    word_id = new_word.word_id
+
+                else:
+                    word_id = q.word_id
+                    q.frequency = q.frequency + dict_words[word]
+                    db.session.commit()
+
+                KeywordDocument = models.KeywordDocument()
+                KeywordDocument.document_id = doc_id
+                KeywordDocument.word_id = word_id
+                KeywordDocument.frequency = dict_words[word]
+                db.session.add(KeywordDocument)
+                db.session.commit()
         i += 1
 
     documents_to_parse.clear()
+    return None
 
 
-t1 = threading.Thread(target=scraping_thread)
+threads = []
 
 
 def index(text_to_crawl: list) -> dict:
@@ -115,8 +121,14 @@ def scrape_webpage(url: str):
 
 def start_scraping_documents(list_urls: str):
     documents_to_parse.extend(list_urls)
-    if not t1.is_alive():
-        t1.start()
+    if len(threads) > 0:
+        if threads[0].is_alive():
+            return
+        else:
+            threads.clear()
+    t1 = threading.Thread(target=scraping_thread)
+    threads.append(t1)
+    threads[0].start()
     pass
 
 
