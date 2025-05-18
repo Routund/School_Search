@@ -38,12 +38,14 @@ body{
     margin-left: 2%;
     margin-right: 2%;
     border-radius: 30px;
-    min-height: 30px;
+    min-height: 100px;
 }
 .admin_panel_tabs_container{
     display: grid;
-    grid-template-columns: auto auto auto auto;
-    padding-top: 5%;
-    padding-left: 5%;
-    padding-right: 5%;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding-top: 10px;
+}
+.admin_panel_tab{
+    font-size: 25px;
+
 }
