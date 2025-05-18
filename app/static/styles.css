@@ -1,21 +1,49 @@
 :root{
     --bhs_green_dark: #325044;
     --bhs_green_light: #64a188;
-}
-
-.topBaseBar{
-    text-align: center;
-    min-width: max-content;
-    color: white;
-    background-color: var(--bhs_green_dark);
-    height: 15%;
-    padding-top: auto;
-    padding-bottom: auto;
-
+    --bhs_blue_medium: #275276;
 }
 
 body{
     margin-top: 0px;
     margin-left: 0px;
     margin-right: 0px;
+}
+
+/* Styles for the top bar*/
+.topBaseBar{
+    text-align: left;
+    min-width: max-content;
+    color: white;
+    background-color: var(--bhs_green_dark);
+    height: 70px;
+    padding-top: 10px;
+    padding-left: 5px;
+    padding-bottom: 10px;
+}
+.bhsLogo{
+    height: 100%;
+}
+
+/* Styles for the admin page*/
+.admin_page_title{
+    text-align: center;
+    font-size: 40px;
+}
+.admin_page_container{
+    text-align: center;
+    background-color: #D9D9D9;
+    color: var(--bhs_blue_medium);
+    width: auto;
+    margin-left: 2%;
+    margin-right: 2%;
+    border-radius: 30px;
+    min-height: 30px;
+}
+.admin_panel_tabs_container{
+    display: grid;
+    grid-template-columns: auto auto auto auto;
+    padding-top: 5%;
+    padding-left: 5%;
+    padding-right: 5%;
 }

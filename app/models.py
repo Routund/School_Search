@@ -8,6 +8,7 @@ class Document(db.Model):
     title = db.Column(db.String(50))
     intro = db.Column(db.Text())
     source = db.Column(db.String(50))
+    length = db.Column(db.Integer)
 
     words = db.relationship('KeywordDocument', back_populates='Document',
                             foreign_keys='KeywordDocument.document_id')

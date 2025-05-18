@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- 0: URL, 1: Title, 2: Source, 3:Intro -->
+{% for result in results_list %}
+    <a href = "{{ result[0] }}" class = "resultContainer">
+        <h2 class = "resultTitle">{{result[1]}}</h2>
+        <h5 class = "resultSource">{{results[2]}}</h5>
+        <p class = "resultIntro">{{results[3]}}</p>
+    </a>
+    <hr class = "resultDivider">
+{% endfor %}
+{% endblock %}

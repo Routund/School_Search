@@ -32,19 +32,21 @@ def scraping_thread():
             continue
 
         with app.app_context():
+            # Returns tuple of (dictionary_words, length of document)
+            dict_words = index(result[0].translate(translator).split())
+
             new_document = models.Document()
             new_document.title = result[1]
             new_document.source = result[2]
             new_document.intro = result[0][0:min(len(result[0])-1, 100)] + "..." # noqa
             new_document.link = url
+            new_document.length = dict_words[1]
 
             db.session.add(new_document)
             db.session.commit()
             doc_id = new_document.document_id
 
-            dict_words = index(result[0].translate(translator).split())
-
-            for word in dict_words:
+            for word in dict_words[0]:
                 q = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
                 word_id = 0
                 if not bool(q):
@@ -73,6 +75,7 @@ def scraping_thread():
 
 
 threads = []
+lemmatizer = WordNetLemmatizer()
 
 
 def index(text_to_crawl: list) -> dict:
@@ -87,15 +90,13 @@ def index(text_to_crawl: list) -> dict:
     word_freqs = {
     }
 
-    lemmatizer = WordNetLemmatizer()
-
     for key in raw_word_freqs.keys():
         lemma = lemmatizer.lemmatize(key)
         word_freqs[lemma] = word_freqs.get(lemma, 0) + raw_word_freqs[key]
 
     print(word_freqs)
 
-    return word_freqs
+    return (word_freqs, len(raw_word_freqs.keys()))
 
 
 def scrape_webpage(url: str):
