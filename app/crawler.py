@@ -6,6 +6,7 @@ from app import app
 import app.models as models
 from app.routes import db
 from string import punctuation
+from PyPDF2 import PdfFileReader
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -21,16 +22,33 @@ translator = str.maketrans(' ', ' ', punctuation)
 def scraping_thread():
     i = 0
     while i < len(documents_to_parse):
-        url = documents_to_parse[i]
-        # results is list of [text, title, source]
-        result = scrape_webpage(url)
+        url = documents_to_parse[i][0]
+        url_or_html = documents_to_parse[i][1]
+        result = []
 
-        # Check if error is thrown when trying to fetch info from website
-        if result == 0:
-            problematic.append(url)
-            i += 1
-            continue
+        # This means that the input data is a url
+        if url_or_html == 1:
+            # results is list of [text, title, source]
+            result = scrape_webpage(url)
 
+            # Check if error is thrown when trying to fetch info from website
+            if result == 0:
+                problematic.append(url)
+                i += 1
+                continue
+        # This means that the input is a pdf
+        elif url_or_html == 2:
+            reader = PdfFileReader(url)
+            text = ""
+            for j in range(len(reader.pages)):
+                text = text + reader.pages[j].extract_text(0)
+            url = documents_to_parse[i][2]
+            result = (text, documents_to_parse[i][3].name, parse.urlsplit(url).netloc)
+        # This means that document is straight html
+        else:
+            soup = BeautifulSoup(url, "html.parser")
+            result = (soup.get_text(), soup.title.text, parse.urlsplit(documents_to_parse[i][2]).netloc)
+            url = documents_to_parse[i][2]
         with app.app_context():
             # Returns tuple of (dictionary_words, length of document)
             dict_words = index(result[0].translate(translator).split())
@@ -69,6 +87,7 @@ def scraping_thread():
                 db.session.add(KeywordDocument)
                 db.session.commit()
         i += 1
+
 
     documents_to_parse.clear()
     return None

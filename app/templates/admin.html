@@ -4,18 +4,22 @@
     <h1 class = "admin_page_title">Admin Panel</h1>
     <div class = "admin_page_container">
         <div class = "admin_panel_tabs_container">
-            <div class = "admin_panel_tab">
+            <button class = "admin_panel_tab">
                 Documents
-            </div>
-            <div class = "admin_panel_tab">
+            </button>
+            <button class = "admin_panel_tab">
                 Users
-            </div>
-            <div class = "admin_panel_tab">
+            </button>
+            <button class = "admin_panel_tab">
                 Permissions
-            </div>
-            <div class = "admin_panel_tab">
+            </button>
+            <button class = "admin_panel_tab">
                 Logs
-            </div>
+            </button>
+        </div>
+        <div class="admin_panel_content_container">
+            {% block admin %}
+            {% endblock%}
         </div>
     </div>
 {% endblock %}

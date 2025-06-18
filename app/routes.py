@@ -1,8 +1,10 @@
 from app import app
-from flask import render_template, redirect
+from flask import render_template, redirect, request
 from flask_sqlalchemy import SQLAlchemy
-from os import path
+from os import path,SEEK_END
+from io import BytesIO
 from math import log
+import PyPDF2
 
 basedir = path.abspath(path.dirname(__file__))
 db = SQLAlchemy()
@@ -19,9 +21,9 @@ def home():
     return render_template('base.html')
 
 
-@app.route('/admin')
+@app.route('/admin/documents')
 def admin():
-    return render_template('admin.html')
+    return render_template('admin_documents.html')
 
 
 # Okapi BM25 search based of Medium article by Emma Park
@@ -43,8 +45,7 @@ def okapi_search(query):
         word_obj = db.session.query(app.models.Keyword).filter_by(word=lemma).first()  # noqa
         if not bool(word_obj):
             # freq_total = word_obj.frequency
-            connections = db.session.query(app.models.KeywordDocument).filter_by(
-                                                    word_id=word_obj[0])
+            connections = db.session.query(app.models.KeywordDocument).filter_by(word_id=word_obj[0]) # noqa
             n_with_word = connections.count()
 
             # Inverse Document Frequency
@@ -54,12 +55,27 @@ def okapi_search(query):
                 frequency = doc.frequency
                 score = idf * (frequency*k+1) / ((frequency + k))
                 doc_id = doc.document_id
-                document_rankings[doc_id] = document_rankings.get(doc_id) + score
+                document_rankings[doc_id] = document_rankings.get(doc_id) + score # noqa
 
     return render_template('results.html', title="Search", results=[])
 
 
 @app.route('/insert_docs')
 def insert_docs():
-    crawler.start_scraping_documents(['https://www.burnside.school.nz/enrol/'])
-    return redirect('/')
+    if request.method == 'POST':
+        html = request.form.get('html')
+        url = request.form.get('url')
+        crawler.start_scraping_documents([(html, 0, url)])
+
+        return redirect('/')
+
+
+@app.route('/insert_pdf', methods=['POST'])
+def insert_pdf():
+    if request.method == 'POST':
+        pdf = request.files['pdf']
+        url = request.form.get('url')
+        p = BytesIO(pdf.read())
+        p.seek(0, SEEK_END)
+        crawler.start_scraping_documents([(p, 2, url, pdf)])
+        return redirect('/')

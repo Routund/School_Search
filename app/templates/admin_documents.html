@@ -1,0 +1,18 @@
+{% extends 'admin.html'%}
+
+{% block admin %}
+<h2 class = "admin_section_title">
+    Insert Documents:
+    <br>
+    <form method="post">
+        <textarea name = "html" class = "admin_document_input" rows = "10" cols = "2" required="true"></textarea>
+        <input name = "url" type="text" class = "admin_url_input" required="true">
+        <button formaction="/insert_docs"> INSERT </button>
+    </form>
+    <form method="post" enctype="multipart/form-data">
+        <input name = "pdf" class = "admin_document_input" type="file" accept =".pdf" required="true">
+        <input name = "url" type="text" class = "admin_url_input" required="true">
+        <button formaction="/insert_pdf"> INSERT </button>
+    </form>
+</h2>
+{% endblock %}

@@ -1,5 +1,5 @@
 :root{
-    --bhs_green_dark: #325044;
+    --bhs_green_dark: #004E42;
     --bhs_green_light: #64a188;
     --bhs_blue_medium: #275276;
 }
@@ -39,6 +39,7 @@ body{
     margin-right: 2%;
     border-radius: 30px;
     min-height: 100px;
+    padding-bottom: 1px;
 }
 .admin_panel_tabs_container{
     display: grid;
@@ -46,6 +47,34 @@ body{
     padding-top: 10px;
 }
 .admin_panel_tab{
-    font-size: 25px;
-
+    font-size: 140%;
+    border: none;
+    background-color: transparent;
+}
+.admin_panel_content_container{
+    background-color: white;
+    border-radius: 15px;
+    margin: 20px 10px 5px 10px;
+    padding: 1.5%;
+    
+}
+.admin_section_title{
+    text-align: left;
+}
+.admin_document_input{
+    min-width: 100%;
+    min-height: 300px;
+    border-style: solid;
+    border-width: 10px;
+    text-align: top;
+    max-width:100%;
+}
+.admin_url_input{
+    min-width: 100%;
+    min-height: 50px;
+    border-style: solid;
+    border-width: 10px;
+    text-align: top;
+    max-width:100%;
+    margin-top: 30px;
 }
