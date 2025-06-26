@@ -6,7 +6,9 @@ from app import app
 import app.models as models
 from app.routes import db
 from string import punctuation
-from PyPDF2 import PdfFileReader
+from pypdf import PdfReader
+from io import BytesIO
+from os import SEEK_END
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -22,12 +24,13 @@ translator = str.maketrans(' ', ' ', punctuation)
 def scraping_thread():
     i = 0
     while i < len(documents_to_parse):
-        url = documents_to_parse[i][0]
+        url = ""
         url_or_html = documents_to_parse[i][1]
         result = []
 
         # This means that the input data is a url
         if url_or_html == 1:
+            url = documents_to_parse[i][0]
             # results is list of [text, title, source]
             result = scrape_webpage(url)
 
@@ -38,15 +41,17 @@ def scraping_thread():
                 continue
         # This means that the input is a pdf
         elif url_or_html == 2:
-            reader = PdfFileReader(url)
+            pdf_bytes = BytesIO(documents_to_parse[i][0].read())
+            pdf_bytes.seek(0, SEEK_END)
+            reader = PdfReader(pdf_bytes)
             text = ""
             for j in range(len(reader.pages)):
                 text = text + reader.pages[j].extract_text(0)
             url = documents_to_parse[i][2]
-            result = (text, documents_to_parse[i][3].name, parse.urlsplit(url).netloc)
+            result = (text, documents_to_parse[i][0].filename[:-4], parse.urlsplit(url).netloc)
         # This means that document is straight html
         else:
-            soup = BeautifulSoup(url, "html.parser")
+            soup = BeautifulSoup(documents_to_parse[i][0], "html.parser")
             result = (soup.get_text(), soup.title.text, parse.urlsplit(documents_to_parse[i][2]).netloc)
             url = documents_to_parse[i][2]
         with app.app_context():
@@ -70,24 +75,23 @@ def scraping_thread():
                 if not bool(q):
                     new_word = models.Keyword()
                     new_word.word = word
-                    new_word.frequency = dict_words[word]
+                    new_word.frequency = dict_words[0][word]
                     db.session.add(new_word)
                     db.session.commit()
                     word_id = new_word.word_id
 
                 else:
                     word_id = q.word_id
-                    q.frequency = q.frequency + dict_words[word]
+                    q.frequency = q.frequency + dict_words[0][word]
                     db.session.commit()
 
                 KeywordDocument = models.KeywordDocument()
                 KeywordDocument.document_id = doc_id
                 KeywordDocument.word_id = word_id
-                KeywordDocument.frequency = dict_words[word]
+                KeywordDocument.frequency = dict_words[0][word]
                 db.session.add(KeywordDocument)
                 db.session.commit()
         i += 1
-
 
     documents_to_parse.clear()
     return None

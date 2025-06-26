@@ -2,12 +2,12 @@
 
 {% block content %}
 
-<!-- 0: URL, 1: Title, 2: Source, 3:Intro -->
-{% for result in results_list %}
-    <a href = "{{ result[0] }}" class = "resultContainer">
-        <h2 class = "resultTitle">{{result[1]}}</h2>
-        <h5 class = "resultSource">{{results[2]}}</h5>
-        <p class = "resultIntro">{{results[3]}}</p>
+<!-- 1: URL, 2: Title, 3: Source, 4:Intro (0 is doc score for ranking)-->
+{% for result in results %}
+    <a href = "{{ result[1] }}" class = "resultContainer">
+        <h2 class = "resultTitle">{{result[2]}}</h2>
+        <h5 class = "resultSource">{{result[3]}}</h5>
+        <p class = "resultIntro">{{result[4]}}</p>
     </a>
     <hr class = "resultDivider">
 {% endfor %}

@@ -1,10 +1,9 @@
 from app import app
 from flask import render_template, redirect, request
 from flask_sqlalchemy import SQLAlchemy
-from os import path,SEEK_END
-from io import BytesIO
+from os import path
 from math import log
-import PyPDF2
+
 
 basedir = path.abspath(path.dirname(__file__))
 db = SQLAlchemy()
@@ -36,18 +35,17 @@ def okapi_search(query):
 
     # Make query set to avoid duplicate work for the same word
     set_words = set(query.split('_'))
-    n_docs = db.session.query(app.models.Document)
+    n_docs = db.session.query(crawler.models.Document).count()
     document_rankings = {}
 
     for word in set_words:
         # lemma is root word of word e. steamed -> steam
         lemma = crawler.lemmatizer.lemmatize(word)
-        word_obj = db.session.query(app.models.Keyword).filter_by(word=lemma).first()  # noqa
-        if not bool(word_obj):
+        word_obj = db.session.query(crawler.models.Keyword).filter_by(word=lemma).first()  # noqa
+        if bool(word_obj):
             # freq_total = word_obj.frequency
-            connections = db.session.query(app.models.KeywordDocument).filter_by(word_id=word_obj[0]) # noqa
+            connections = db.session.query(crawler.models.KeywordDocument).filter_by(word_id=word_obj.word_id) # noqa
             n_with_word = connections.count()
-
             # Inverse Document Frequency
             # It measures specificity of word across docs
             idf = log((n_docs - n_with_word + 0.5)/(n_with_word + 0.5)+1)
@@ -55,9 +53,20 @@ def okapi_search(query):
                 frequency = doc.frequency
                 score = idf * (frequency*k+1) / ((frequency + k))
                 doc_id = doc.document_id
-                document_rankings[doc_id] = document_rankings.get(doc_id) + score # noqa
+                document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score # noqa
+    results = []
 
-    return render_template('results.html', title="Search", results=[])
+    for doc_id in document_rankings.keys():
+        doc_query = db.session.query(crawler.models.Document).filter_by(document_id=doc_id).first() # noqa
+        results.append((document_rankings[doc_id],
+                        doc_query.link,
+                        doc_query.title,
+                        doc_query.source,
+                        doc_query.intro
+                        ))
+    print(results)
+
+    return render_template('results.html', title="Search", results=results)
 
 
 @app.route('/insert_docs')
@@ -75,7 +84,5 @@ def insert_pdf():
     if request.method == 'POST':
         pdf = request.files['pdf']
         url = request.form.get('url')
-        p = BytesIO(pdf.read())
-        p.seek(0, SEEK_END)
-        crawler.start_scraping_documents([(p, 2, url, pdf)])
+        crawler.start_scraping_documents([(pdf, 2, url)])
         return redirect('/')
