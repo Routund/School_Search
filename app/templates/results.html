@@ -1,14 +1,30 @@
 {% extends 'base.html' %}
 
+<head>
+    <script>
+         document.addEventListener('DOMContentLoaded', function() {
+            
+         });
+
+         function search(){
+            var query = document.getElementById("search_bar").value();
+            
+         }
+    </script>
+</head>
+
 {% block content %}
+
+<input type="text" id = "search_bar" value = "{{query}}" class = "results_search_bar">
 
 <!-- 1: URL, 2: Title, 3: Source, 4:Intro (0 is doc score for ranking)-->
 {% for result in results %}
-    <a href = "{{ result[1] }}" class = "resultContainer">
-        <h2 class = "resultTitle">{{result[2]}}</h2>
-        <h5 class = "resultSource">{{result[3]}}</h5>
-        <p class = "resultIntro">{{result[4]}}</p>
+    <a href = "{{ result[1] }}" class = "result_container">
+        <h2 class = "result_title">{{result[2]}}</h2>
+        <h5 class = "result_text">{{result[3]}}</h5>
+        <p class = "result_text">{{result[4]}}</p>
     </a>
     <hr class = "resultDivider">
 {% endfor %}
+
 {% endblock %}

@@ -6,9 +6,10 @@ from app import app
 import app.models as models
 from app.routes import db
 from string import punctuation
-from pypdf import PdfReader
-from io import BytesIO
-from os import SEEK_END
+# from pypdf import PdfReader
+from pdf2image import convert_from_bytes
+import easyocr
+from numpy import array
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -19,6 +20,7 @@ from os import SEEK_END
 documents_to_parse = []
 problematic = []
 translator = str.maketrans(' ', ' ', punctuation)
+reader = easyocr.Reader(['en'])
 
 
 def scraping_thread():
@@ -41,14 +43,16 @@ def scraping_thread():
                 continue
         # This means that the input is a pdf
         elif url_or_html == 2:
-            pdf_bytes = BytesIO(documents_to_parse[i][0].read())
-            pdf_bytes.seek(0, SEEK_END)
-            reader = PdfReader(pdf_bytes)
-            text = ""
-            for j in range(len(reader.pages)):
-                text = text + reader.pages[j].extract_text(0)
+            pdf_image = convert_from_bytes(documents_to_parse[i][0].read())
+            total_text = ""
+            for page_number, page_data in enumerate(pdf_image):
+                pdf_array = array(page_data)
+                results = reader.readtext(pdf_array, detail=0)
+                for detected_string in results:
+                    total_text = total_text + " " + detected_string
+
             url = documents_to_parse[i][2]
-            result = (text, documents_to_parse[i][0].filename[:-4], parse.urlsplit(url).netloc)
+            result = (total_text, documents_to_parse[i][0].filename[:-4], parse.urlsplit(url).netloc)
         # This means that document is straight html
         else:
             soup = BeautifulSoup(documents_to_parse[i][0], "html.parser")

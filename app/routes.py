@@ -40,7 +40,7 @@ def okapi_search(query):
 
     for word in set_words:
         # lemma is root word of word e. steamed -> steam
-        lemma = crawler.lemmatizer.lemmatize(word)
+        lemma = crawler.lemmatizer.lemmatize(word.lower())
         word_obj = db.session.query(crawler.models.Keyword).filter_by(word=lemma).first()  # noqa
         if bool(word_obj):
             # freq_total = word_obj.frequency
@@ -66,7 +66,7 @@ def okapi_search(query):
                         ))
     print(results)
 
-    return render_template('results.html', title="Search", results=results)
+    return render_template('results.html', title="Search", results=results, query=" ".join(query.split('_')))
 
 
 @app.route('/insert_docs')
