@@ -24,11 +24,17 @@ def home():
 def admin():
     return render_template('admin_documents.html')
 
+@app.route('/search')
+def search_start():
+    return render_template('search.html')
+
 
 # Okapi BM25 search based of Medium article by Emma Park
 # https://medium.com/@readwith_emma/understanding-okapi-bm25-document-ranking-algorithm-70d81adab001
 @app.route('/search/<query>')
 def okapi_search(query):
+    if query is None:
+        return redirect('/search')
     # Saturation Parameter
     # (Sets how much a word appearing in a document improves it's score)
     k = 1.2
@@ -40,7 +46,7 @@ def okapi_search(query):
 
     for word in set_words:
         # lemma is root word of word e. steamed -> steam
-        lemma = crawler.lemmatizer.lemmatize(word.lower())
+        lemma = crawler.stemmer.stem(word.lower().translate(crawler.translator))
         word_obj = db.session.query(crawler.models.Keyword).filter_by(word=lemma).first()  # noqa
         if bool(word_obj):
             # freq_total = word_obj.frequency

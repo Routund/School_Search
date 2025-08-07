@@ -7,7 +7,7 @@ class Document(db.Model):
     link = db.Column(db.String())
     title = db.Column(db.String(50))
     intro = db.Column(db.Text())
-    source = db.Column(db.String(50))
+    source = db.Column(db.INTeger(50))
     length = db.Column(db.Integer)
 
     words = db.relationship('KeywordDocument', back_populates='Document',
@@ -44,3 +44,11 @@ class KeywordDocument(db.Model):
 
     def __str__(self):
         return self.word_id + ' ' + self.document_id
+
+calss Source(db.Model):
+    __table_name__ = "Source"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String("50"))
+    drive_id = db.Column(db.String("80"))
+    creds = db.Column(db.Json)

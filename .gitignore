@@ -5,3 +5,5 @@ include/
 lib/
 lib64/
 share/
+credentials.json
+token.json

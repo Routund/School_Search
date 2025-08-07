@@ -1,4 +1,4 @@
-from nltk.stem import WordNetLemmatizer
+from nltk.stem import WordNetLemmatizer, SnowballStemmer
 from urllib import request, parse
 from bs4 import BeautifulSoup
 import threading
@@ -10,6 +10,16 @@ from string import punctuation
 from pdf2image import convert_from_bytes
 import easyocr
 from numpy import array
+from io import BytesIO
+import google.auth
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+import os
+from google_auth_oauthlib.flow import InstalledAppFlow
+import json
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -21,6 +31,13 @@ documents_to_parse = []
 problematic = []
 translator = str.maketrans(' ', ' ', punctuation)
 reader = easyocr.Reader(['en'])
+
+class file_query_result():
+
+    def __init__(self,id,name,link):
+        self.id=id
+        self.name=name
+        self.link=link
 
 
 def scraping_thread():
@@ -102,7 +119,7 @@ def scraping_thread():
 
 
 threads = []
-lemmatizer = WordNetLemmatizer()
+stemmer = SnowballStemmer("english")
 
 
 def index(text_to_crawl: list) -> dict:
@@ -118,7 +135,7 @@ def index(text_to_crawl: list) -> dict:
     }
 
     for key in raw_word_freqs.keys():
-        lemma = lemmatizer.lemmatize(key)
+        lemma = stemmer.stem(key)
         word_freqs[lemma] = word_freqs.get(lemma, 0) + raw_word_freqs[key]
 
     print(word_freqs)
@@ -159,6 +176,87 @@ def start_scraping_documents(list_urls: str):
     threads[0].start()
     pass
 
+
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+
+def get_credentials():
+    creds = None
+    if os.path.exists("token.json"):
+        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                "credentials.json", SCOPES
+            )
+            creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open("token.json", "w") as token:
+                token.write(creds.to_json())
+    return creds
+
+
+# Borrowed from https://www.merge.dev/blog/get-folders-google-drive-api
+def get_folders_for_selection():
+    folders = []
+
+    try:
+        service = build("drive", "v3", credentials=get_credentials())
+        page_token = None
+
+        while True:
+            # Call the Drive v3 API
+            results = (
+                service.files()
+                .list(q="mimeType = 'application/vnd.google-apps.folder'",
+                        spaces="drive",
+                        fields="nextPageToken, files(id, name)",
+                        pageToken=page_token)
+                .execute()
+            )
+            items = results.get("files", [])
+            for item in items:
+                folders.append((item['id'],item['name']))
+
+            if page_token is None:
+                break
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+    return folders
+
+
+def get_files_in_folder(folder_id):
+    try:
+        service = build("drive", "v3", credentials=get_credentials())
+
+        files = []
+
+        # Call the Drive v3 API
+        results = (
+            service.files()
+            .list(q=f"'{folder_id}' in parents", pageSize=10, fields="nextPageToken, files(id, name, webViewLink)")
+            .execute()
+        )
+        
+        items = results.get("files", [])
+
+        if not items:
+            print("No files found.")
+            return
+        print("Files:")
+        for item in items:
+            new_file = file_query_result(id=item['id'],name=items['name'])
+            files.append(new_file)
+            print(f"{item['name']} ({item['id']})")
+    except HttpError as error:
+        # TODO(developer) - Handle errors from drive API.
+        print(f"An error occurred: {error}")
+
+
+print(get_folders_for_selection())
 
 # inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision
 # -and-values/").translate(translator).split()
