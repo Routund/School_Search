@@ -1,4 +1,4 @@
-from nltk.stem import WordNetLemmatizer, SnowballStemmer
+from nltk.stem import SnowballStemmer
 from urllib import request, parse
 from bs4 import BeautifulSoup
 import threading
@@ -6,12 +6,9 @@ from app import app
 import app.models as models
 from app.routes import db
 from string import punctuation
-# from pypdf import PdfReader
-from pdf2image import convert_from_bytes
 import easyocr
-from numpy import array
+from pypdf import PdfReader
 from io import BytesIO
-import google.auth
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
@@ -28,93 +25,134 @@ import json
 # nltk.download('wordnet')
 
 documents_to_parse = []
+folders_to_parse = []
 problematic = []
 translator = str.maketrans(' ', ' ', punctuation)
 reader = easyocr.Reader(['en'])
 
+
 class file_query_result():
 
-    def __init__(self,id,name,link):
-        self.id=id
-        self.name=name
-        self.link=link
+    def __init__(self, id, name, link):
+        self.id = id
+        self.name = name
+        self.link = link
 
 
-def scraping_thread():
+def scraping_thread_folders():
     i = 0
-    while i < len(documents_to_parse):
-        url = ""
-        url_or_html = documents_to_parse[i][1]
-        result = []
+    with app.app_context():
+        while i < len(folders_to_parse):
+            folder_id = folders_to_parse[i]
+            q_folder = db.session.query(models.Source).filter_by(source_id=folder_id).first()
 
-        # This means that the input data is a url
-        if url_or_html == 1:
-            url = documents_to_parse[i][0]
-            # results is list of [text, title, source]
-            result = scrape_webpage(url)
-
-            # Check if error is thrown when trying to fetch info from website
-            if result == 0:
-                problematic.append(url)
+            # Check folder exists
+            if not bool(q_folder):
+                problematic.append(folder_id)
                 i += 1
                 continue
-        # This means that the input is a pdf
-        elif url_or_html == 2:
-            pdf_image = convert_from_bytes(documents_to_parse[i][0].read())
-            total_text = ""
-            for page_number, page_data in enumerate(pdf_image):
-                pdf_array = array(page_data)
-                results = reader.readtext(pdf_array, detail=0)
-                for detected_string in results:
-                    total_text = total_text + " " + detected_string
 
-            url = documents_to_parse[i][2]
-            result = (total_text, documents_to_parse[i][0].filename[:-4], parse.urlsplit(url).netloc)
-        # This means that document is straight html
-        else:
-            soup = BeautifulSoup(documents_to_parse[i][0], "html.parser")
-            result = (soup.get_text(), soup.title.text, parse.urlsplit(documents_to_parse[i][2]).netloc)
-            url = documents_to_parse[i][2]
-        with app.app_context():
-            # Returns tuple of (dictionary_words, length of document)
-            dict_words = index(result[0].translate(translator).split())
+            # Get important info about folder
+            folder_drive_id = q_folder.drive_id
+            # We load the json twice, once to remove \\'s
+            # And again to make it to a dict
+            creds = Credentials.from_authorized_user_info(json.loads(json.loads(q_folder.creds)))
+            files_to_search = get_files_in_folder(folder_drive_id, creds)
+            stored_files = [x.document_id for x in q_folder.documents]
 
-            new_document = models.Document()
-            new_document.title = result[1]
-            new_document.source = result[2]
-            new_document.intro = result[0][0:min(len(result[0])-1, 100)] + "..." # noqa
-            new_document.link = url
-            new_document.length = dict_words[1]
+            for file_result in files_to_search:
+                # Convert the bytes that google docs gives documents as to pdfs
+                file_bytes = get_file_from_drive(file_result.id, creds)
+                file_bytes.seek(0, os.SEEK_END)
+                reader = PdfReader(file_bytes)
 
-            db.session.add(new_document)
-            db.session.commit()
-            doc_id = new_document.document_id
+                text = ""
+                for j in range(len(reader.pages)):
+                    text = text + reader.pages[j].extract_text(0)
 
-            for word in dict_words[0]:
-                q = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
-                word_id = 0
-                if not bool(q):
-                    new_word = models.Keyword()
-                    new_word.word = word
-                    new_word.frequency = dict_words[0][word]
-                    db.session.add(new_word)
+                # Get all words out of pdf
+                dict_words = index(text.translate(translator).split())
+                # Query to check if the document already exists
+                q_document = db.session.query(models.Document).filter_by(link=file_result.link).first()
+                if not bool(q_document):
+                    # Path that runs if document doesn't exist
+                    new_document = models.Document()
+                    new_document.title = file_result.name
+                    new_document.source = folder_id
+                    new_document.intro = text[0:min(len(text)-1, 100)] + "..."
+                    new_document.link = file_result.link
+                    new_document.length = dict_words[1]
+
+                    db.session.add(new_document)
                     db.session.commit()
-                    word_id = new_word.word_id
+                    doc_id = new_document.document_id
+                    for word in dict_words[0]:
+                        freq = dict_words[0][word]
+                        q_word = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
+                        word_id = 0
+                        if not bool(q_word):
+                            word_id = insert_new_word(word=word, frequency=freq)
 
+                        else:
+                            word_id = q_word.word_id
+                            q_word.frequency = q_word.frequency + freq
+                            db.session.commit()
+
+                        insert_keyword_doc(doc_id, word_id, freq)
                 else:
-                    word_id = q.word_id
-                    q.frequency = q.frequency + dict_words[0][word]
-                    db.session.commit()
+                    # Path that runs if document does exist
+                    doc_id = q_document.document_id
+                    if doc_id in stored_files:
+                        stored_files.remove(doc_id)
+                    prev_connections = [x.word_id for x in q_document.words]
+                    for word in dict_words[0]:
+                        freq = dict_words[0][word]
+                        q_word = db.session.query(models.Keyword).filter_by(word=word).first()
+                        word_id = None
+                        if not bool(q_word):
+                            word_id = insert_new_word(word=word, frequency=freq)
+                        else:
+                            word_id = q_word.word_id
+                            if word_id in prev_connections:
+                                prev_connections.remove(word_id)
+                                q_connection = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=word_id).first()
+                                if q_connection.frequency == freq:
+                                    continue
+                                q_word.frequency -= q_connection.frequency
+                                q_word.frequency += freq
+                                q_connection.frequency = freq
+                                db.session.commit()
+                                continue
+                        insert_keyword_doc(doc_id, word_id, freq)
 
-                KeywordDocument = models.KeywordDocument()
-                KeywordDocument.document_id = doc_id
-                KeywordDocument.word_id = word_id
-                KeywordDocument.frequency = dict_words[0][word]
-                db.session.add(KeywordDocument)
+                    # Delete indexed words not in document anymore
+                    for conn_left in prev_connections:
+                        conn = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=conn_left).first()
+                        word = db.session.query(models.Keyword).filter_by(word_id=conn.word_id).first()
+                        word.frequency -= conn.frequency
+                        if word.frequency == 0:
+                            db.session.delete(word)
+                        db.session.delete(conn)
+                        db.session.commit()
+
+            # Delete all the indexed files that aren't in the folder anymore
+            for file_left in stored_files:
+                doc = db.session.query(models.Document).filter_by(document_id=file_left).first()
+                words = [x.word_id for x in doc.words]
+                for word_id in words:
+                    conn = db.session.query(models.KeywordDocument).filter_by(document_id=doc.document_id, word_id=word_id).first()
+                    word_obj = db.session.query(models.Keyword).filter_by(word_id=word_id).first()
+                    word_obj.frequency -= conn.frequency
+                    db.session.delete(conn)
+                    if word_obj.frequency == 0:
+                        db.session.delete(word_obj)
                 db.session.commit()
-        i += 1
-
-    documents_to_parse.clear()
+                db.session.delete(doc)
+                db.session.commit()
+            del creds
+            del q_folder
+            i += 1
+    folders_to_parse.clear()
     return None
 
 
@@ -164,14 +202,14 @@ def scrape_webpage(url: str):
         return 0
 
 
-def start_scraping_documents(list_urls: str):
-    documents_to_parse.extend(list_urls)
+def start_scraping_folders(list_folders: str):
+    folders_to_parse.extend(list_folders)
     if len(threads) > 0:
         if threads[0].is_alive():
             return
         else:
             threads.clear()
-    t1 = threading.Thread(target=scraping_thread)
+    t1 = threading.Thread(target=scraping_thread_folders)
     threads.append(t1)
     threads[0].start()
     pass
@@ -184,7 +222,7 @@ def get_credentials():
     creds = None
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -219,7 +257,7 @@ def get_folders_for_selection():
             )
             items = results.get("files", [])
             for item in items:
-                folders.append((item['id'],item['name']))
+                folders.append((item['id'], item['name']))
 
             if page_token is None:
                 break
@@ -228,37 +266,101 @@ def get_folders_for_selection():
     return folders
 
 
-def get_files_in_folder(folder_id):
+def get_files_in_folder(folder_id, creds):
     try:
-        service = build("drive", "v3", credentials=get_credentials())
+        service = build("drive", "v3", credentials=creds)
 
         files = []
 
         # Call the Drive v3 API
         results = (
             service.files()
-            .list(q=f"'{folder_id}' in parents", pageSize=10, fields="nextPageToken, files(id, name, webViewLink)")
+            .list(q=f"'{folder_id}' in parents",
+                  pageSize=10,
+                  fields="nextPageToken, files(id, name, webViewLink)")
             .execute()
         )
-        
+
         items = results.get("files", [])
 
         if not items:
             print("No files found.")
-            return
+            return None
         print("Files:")
         for item in items:
-            new_file = file_query_result(id=item['id'],name=items['name'])
+            new_file = file_query_result(id=item['id'],
+                                         name=item['name'],
+                                         link=item['webViewLink'])
             files.append(new_file)
             print(f"{item['name']} ({item['id']})")
+        return files
     except HttpError as error:
         # TODO(developer) - Handle errors from drive API.
         print(f"An error occurred: {error}")
+        return None
 
 
-print(get_folders_for_selection())
+def get_file_from_drive(file_id, creds):
+    try:
+        # create drive api client
+        service = build("drive", "v3", credentials=creds)
+
+        # pylint: disable=maybe-no-member
+        request = service.files().export_media(
+            fileId=file_id, mimeType="application/pdf"
+        )
+        file = BytesIO()
+        downloader = MediaIoBaseDownload(file, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        print(f"Download {int(status.progress() * 100)}.")
+
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return None
+
+    return file
+
+
+def add_folder(name, drive_id, creds):
+    with app.app_context():
+        new_source = models.Source()
+        new_source.name = name
+        new_source.drive_id = drive_id
+        new_source.creds = creds
+        db.session.add(new_source)
+        db.session.commit()
+
+
+start_scraping_folders([1])
+# '1OmfhGwLpSEQ2KwZgsiAN3lBIR2TlSSU2'
 
 # inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision
 # -and-values/").translate(translator).split()
 
 # index(inp)
+
+# res = get_folders_for_selection()[0]
+
+# print(res)
+
+
+def insert_new_word(word, frequency):
+    with app.app_context():
+        new_word = models.Keyword()
+        new_word.word = word
+        new_word.frequency = frequency
+        db.session.add(new_word)
+        db.session.commit()
+        return new_word.word_id
+
+
+def insert_keyword_doc(doc, word, frequency):
+    with app.app_context():
+        KeywordDocument = models.KeywordDocument()
+        KeywordDocument.document_id = doc
+        KeywordDocument.word_id = word
+        KeywordDocument.frequency = frequency
+        db.session.add(KeywordDocument)
+        db.session.commit()

@@ -75,20 +75,20 @@ def okapi_search(query):
     return render_template('results.html', title="Search", results=results, query=" ".join(query.split('_')))
 
 
-@app.route('/insert_docs')
-def insert_docs():
-    if request.method == 'POST':
-        html = request.form.get('html')
-        url = request.form.get('url')
-        crawler.start_scraping_documents([(html, 0, url)])
+# @app.route('/insert_docs')
+# def insert_docs():
+#     if request.method == 'POST':
+#         html = request.form.get('html')
+#         url = request.form.get('url')
+#         crawler.start_scraping_documents([(html, 0, url)])
 
-        return redirect('/')
+#         return redirect('/')
 
 
-@app.route('/insert_pdf', methods=['POST'])
-def insert_pdf():
-    if request.method == 'POST':
-        pdf = request.files['pdf']
-        url = request.form.get('url')
-        crawler.start_scraping_documents([(pdf, 2, url)])
-        return redirect('/')
+# @app.route('/insert_pdf', methods=['POST'])
+# def insert_pdf():
+#     if request.method == 'POST':
+#         pdf = request.files['pdf']
+#         url = request.form.get('url')
+#         crawler.start_scraping_documents([(pdf, 2, url)])
+#         return redirect('/')
