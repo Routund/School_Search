@@ -332,8 +332,6 @@ def add_folder(name, drive_id, creds):
         db.session.add(new_source)
         db.session.commit()
 
-
-start_scraping_folders([1])
 # '1OmfhGwLpSEQ2KwZgsiAN3lBIR2TlSSU2'
 
 # inp = scrape_webpage("https://www.burnside.school.nz/explore-burnside/vision

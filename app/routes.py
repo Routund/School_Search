@@ -1,5 +1,5 @@
 from app import app
-from flask import render_template, redirect, request
+from flask import render_template, redirect, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from math import log
@@ -72,8 +72,16 @@ def okapi_search(query):
                         ))
     print(results)
 
-    return render_template('results.html', title="Search", results=results, query=" ".join(query.split('_')))
+    return render_template('results.html',
+                           title="Search",
+                           results=results,
+                           query=" ".join(query.split('_')))
 
+
+@app.route('/get_folders', methods=['POST'])
+def get_folders():
+    folder_list = crawler.get_folders_for_selection()
+    return jsonify({'folders': folder_list})
 
 # @app.route('/insert_docs')
 # def insert_docs():
