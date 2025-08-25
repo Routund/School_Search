@@ -10,7 +10,7 @@ class Document(db.Model):
     source = db.Column(db.Integer, db.ForeignKey('Source.source_id'))
     source_obj = db.relationship('Source', back_populates='documents')
     length = db.Column(db.Integer)
-
+    last_time = db.Column(db.Integer)
     words = db.relationship('KeywordDocument', back_populates='Document',
                             foreign_keys='KeywordDocument.document_id')
 
@@ -52,7 +52,6 @@ class Source(db.Model):
 
     source_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String("50"))
-    drive_id = db.Column(db.String("80"))
-    creds = db.Column(db.String("80"))
+    home_url = db.Column(db.String("80"))
     documents = db.relationship('Document', back_populates='source_obj')
     

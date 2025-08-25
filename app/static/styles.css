@@ -46,7 +46,7 @@ body{
 }
 .admin_panel_tabs_container{
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     padding-top: 10px;
 }
 .admin_panel_tab{
@@ -64,22 +64,92 @@ body{
 .admin_section_title{
     text-align: left;
 }
-.admin_document_input{
-    min-width: 100%;
-    min-height: 300px;
-    border-style: solid;
-    border-width: 10px;
-    text-align: top;
-    max-width:100%;
+
+
+/* Subsection for classes about displaying the different sources*/
+.admin_source_section_div{
+    grid-template-columns: 17fr 15fr;
+    display: grid;
+    height: 500px;
+    margin-bottom: 10px;
+    gap: 1%;
 }
-.admin_url_input{
-    min-width: 100%;
-    min-height: 50px;
-    border-style: solid;
-    border-width: 10px;
-    text-align: top;
-    max-width:100%;
-    margin-top: 30px;
+.admin_source_list{
+    background-color: #D9D9D9;
+    border-radius: 30px;
+    height: 100%;
+    overflow-y: scroll;
+}
+.admin_source_info_display_tab{
+    background-color: white;
+    border-radius: 30px;
+    border: #D9D9D9 solid 10px;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    height: 100%;
+    width: 100%;
+    overflow-y: scroll;
+    padding: 15px;
+    margin: auto auto auto auto;
+}
+.admin_new_source_button{
+    height: 15%;
+    text-decoration: bold;
+    text-align: left;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    padding-top: auto;
+    padding-left: 5%;
+    padding-bottom: auto;
+    font-size: 30px;
+    color: var(--bhs_blue_medium);
+    background: none;
+    border: none;
+    width: 100%;
+
+}
+.admin_new_source_button:hover{
+    background: #a5a5a5;
+}
+#admin_new_source_form{
+    background-color: white;
+    position: fixed;
+    width: 40%;
+    left: 30%;
+    right: 30%;
+    border-radius: 30px;
+    border: 5px #a5a5a5 solid;
+    opacity: 0.0;
+    transition: 0.3s;
+    z-index: 10;
+    height: 40%;
+    top: 25%;
+    bottom: 25%;
+    font-size: 20px;
+}
+#admin_new_source_form.shown{
+    opacity: 1.0;
+}
+#admin_new_source_form_input_grid{
+    margin-left: auto;
+    margin-right: auto;
+    display: grid;
+    grid-template-columns: 1fr 5fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    width:50%;
+    text-align: right;
+    gap: 10%;
+}
+#admin_source_succesful_insert{
+    color: #116ebb;
+    background-color: #abcae4;
+    border-radius: 15px;
+    border: #116ebb solid 2px;
+    margin-left: 5%;
+    margin-right: 5%;
+    margin-top: 5%;
+    padding: 12px;
+    visibility: hidden;
 }
 
 
@@ -155,4 +225,23 @@ body{
     font-weight: bold;
     border: none;
 
+}
+
+/* General use */
+ #overlay {
+    background-color: black;
+    display: relative;
+    position:fixed;
+    left:0;
+    top: 0;
+    width:100%;
+    height:100%;
+    opacity: 0.0;
+    pointer-events: none;
+    transition: 0.3s;
+    z-index: 1;
+}
+#overlay.dimmed {
+    opacity: 0.5;
+    pointer-events: all;
 }

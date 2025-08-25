@@ -20,9 +20,14 @@ def home():
     return render_template('base.html')
 
 
-@app.route('/admin/documents')
+@app.route('/admin/documents', methods=['POST', 'GET'])
 def admin():
-    return render_template('admin_documents.html')
+    source_list = db.session.query(crawler.models.Source).all()
+    ids = [x.source_id for x in source_list]
+    names = [x.name for x in source_list]
+    urls = [x.home_url for x in source_list]
+    return render_template('admin_documents.html', ids=ids, names=names, urls=urls)
+
 
 @app.route('/search')
 def search_start():
@@ -37,7 +42,7 @@ def okapi_search(query):
         return redirect('/search')
     # Saturation Parameter
     # (Sets how much a word appearing in a document improves it's score)
-    k = 1.2
+    k = 2
 
     # Make query set to avoid duplicate work for the same word
     set_words = set(query.split('_'))
@@ -57,7 +62,7 @@ def okapi_search(query):
             idf = log((n_docs - n_with_word + 0.5)/(n_with_word + 0.5)+1)
             for doc in connections.all():
                 frequency = doc.frequency
-                score = idf * (frequency*k+1) / ((frequency + k))
+                score = idf * frequency * (k+1) / ((frequency + k))
                 doc_id = doc.document_id
                 document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score # noqa
     results = []
@@ -70,11 +75,10 @@ def okapi_search(query):
                         doc_query.source,
                         doc_query.intro
                         ))
-    print(results)
 
     return render_template('results.html',
                            title="Search",
-                           results=results,
+                           results=reversed(sorted(results)),
                            query=" ".join(query.split('_')))
 
 
@@ -83,14 +87,31 @@ def get_folders():
     folder_list = crawler.get_folders_for_selection()
     return jsonify({'folders': folder_list})
 
-# @app.route('/insert_docs')
-# def insert_docs():
-#     if request.method == 'POST':
-#         html = request.form.get('html')
-#         url = request.form.get('url')
-#         crawler.start_scraping_documents([(html, 0, url)])
 
-#         return redirect('/')
+@app.route('/new_source', methods=['POST'])
+def new_source():
+    data = request.get_json()
+    url = data.get('url')
+    name = data.get('name')
+
+    q_source = db.session.query(crawler.models.Source).filter_by(name=name).first()
+    if bool(q_source):
+        return jsonify({'status': 'name_present'})
+
+    q_source = db.session.query(crawler.models.Source).filter_by(home_url=url).first()
+    if bool(q_source):
+        return jsonify({'status': 'url_present'})
+
+    new_source = crawler.models.Source()
+    new_source.home_url = url
+    new_source.name = name
+    db.session.add(new_source)
+    db.session.commit()
+
+    source_id = new_source.source_id
+
+    crawler.new_source(url, source_id)
+    return jsonify({'status': 'success'})
 
 
 # @app.route('/insert_pdf', methods=['POST'])

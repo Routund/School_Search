@@ -4,15 +4,122 @@
 <h2 class = "admin_section_title">
     Insert Documents:
     <br>
-    <form method="post">
-        <textarea name = "html" class = "admin_document_input" rows = "10" cols = "2" required="true"></textarea>
-        <input name = "url" type="text" class = "admin_url_input" required="true">
-        <button formaction="/insert_docs"> INSERT </button>
-    </form>
-    <form method="post" enctype="multipart/form-data">
-        <input name = "pdf" class = "admin_document_input" type="file" accept =".pdf" required="true">
-        <input name = "url" type="text" class = "admin_url_input" required="true">
-        <button formaction="/insert_pdf"> INSERT </button>
-    </form>
 </h2>
+
+<script>
+    var dimmed = false;
+    var current_id = -1;
+    window.onload=function() {
+        document.body.onkeyup = key_event;
+    }
+
+    function key_event(e) {
+        if (e.keyCode == 27) new_source_hide();
+    }
+
+    function new_source_hide(){
+        if (dimmed){
+            dimmed = false;
+            var overlay = document.getElementById('overlay');
+            var info_box = document.getElementById('admin_new_source_form');
+            overlay.classList.remove('dimmed');
+            info_box.classList.remove('shown');
+            document.getElementById("admin_source_succesful_insert").style.visibility="hidden";
+        }
+    }
+
+    function new_source_popup(){
+        dimmed = true;
+        var overlay = document.getElementById('overlay');
+        var info_box = document.getElementById('admin_new_source_form');
+        overlay.classList.add('dimmed');
+        info_box.classList.add('shown');
+        document.getElementById("admin_source_succesful_insert").style.visibility="hidden";
+    }
+
+    function send_new_source(){
+        url = document.getElementById('url').value;
+        source_name = document.getElementById('name').value;
+        try{
+            new URL(url);
+            console.debug("valid url");
+        } catch (err) {
+            console.debug("invalid url");
+            return;
+        }
+        $.ajax({ 
+            url: '/new_source', 
+            type: 'POST', 
+            contentType: 'application/json', 
+            data: JSON.stringify({ 'url' : encodeURI(url), 'name' : source_name }),
+            success: function(response) {
+                document.getElementById("admin_source_succesful_insert").style.visibility="visible";
+            },
+            error: function(msg){
+                console.debug(msg.response);
+            }
+        });
+    }
+
+    function display_source(){
+        const url= event.target.getAttribute('url');
+        const name = event.target.getAttribute('name');
+        const id = event.target.getAttribute('id');
+        current_id = parseInt(id);
+        var title = document.getElementById("source_display_title");
+        var url_display = document.getElementById("source_display_url");
+        title.textContent = name;
+        url_display.textContent = url;
+        title.style.visibility = "visible";
+        url_display.style.visibility = "visible";
+    }
+    </script>
+
+<!-- <form method="post">
+    <input name = "url" type="text" class = "admin_url_input" required="true">
+    <button formaction="/new_source"> INSERT </button>
+</form> -->
+
+<div class="admin_source_section_div">
+    <div class="admin_source_list">
+        <button class="admin_new_source_button" onclick="new_source_popup()">
+            Add Source +
+        </button>
+        {% for i in range(ids|length)%}
+            <button class ="admin_new_source_button" onclick="display_source()" url = "{{urls[i]}}" name = "{{names[i]}}" id = "{{ids[i]}}">
+                {{names[i]}}
+            </button>
+        {% endfor %}
+    </div>
+    <div class="admin_source_info_display_tab">
+            <div id="source_display_title" style="visibility: hidden;">
+
+            </div>
+            <div id="source_display_url" style="visibility: hidden;">
+                
+            </div>
+    </div>
+</div>
+
+
+<div id="overlay"></div>
+
+<div id="admin_new_source_form">
+    <form method="post">
+        <h1>New Page Source</h1>
+        <div id="admin_new_source_form_input_grid">
+            <div>
+                URL: 
+            </div>
+            <input type = "text" required="true" name="url" id="url">
+            <div>
+                Name: 
+            </div>
+            <input type = "text" required="true" name="name" id="name">
+        </div>
+        <button type="button" onclick="send_new_source()"> INSERT </button>
+        <div id="admin_source_succesful_insert">Source uploaded succesfully! It should take 10 minutes to an hour to fully crawl depending on the size of the website</div>
+    </form>
+</div>
+
 {% endblock %}
