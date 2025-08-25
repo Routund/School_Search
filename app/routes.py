@@ -72,7 +72,7 @@ def okapi_search(query):
         results.append((document_rankings[doc_id],
                         doc_query.link,
                         doc_query.title,
-                        doc_query.source,
+                        doc_query.source_obj.name,
                         doc_query.intro
                         ))
 

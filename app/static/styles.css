@@ -18,15 +18,33 @@ body{
     min-width: max-content;
     color: white;
     background-color: var(--bhs_green_dark);
-    height: 70px;
-    padding-top: 10px;
+    height: 80px;
     padding-left: 5px;
-    padding-bottom: 10px;
 }
 .bhsLogo{
-    height: 100%;
+    padding-top: 8px;
+    height: 64px;
+}
+#top_bar_dropdown{
+    overflow: hidden;
 }
 
+#username_button{
+    float: right;
+    height: 100%;
+    font-size: 30px;
+    background-color: transparent;
+    color: white;
+    border: none;
+    padding-right: 30px;
+    padding-left: 30px;
+}
+#username_button:hover{
+    background-color: rgba(0, 0, 0, 0.171);
+}
+#username_button:focus{
+    background-color: rgba(0, 0, 0, 0.271);
+}
 
 /* Styles for the admin page*/
 .admin_page_title{

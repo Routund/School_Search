@@ -54,4 +54,3 @@ class Source(db.Model):
     name = db.Column(db.String("50"))
     home_url = db.Column(db.String("80"))
     documents = db.relationship('Document', back_populates='source_obj')
-    

@@ -53,115 +53,112 @@ class parse_input():
 
 
 def page_parsing_routine_thread():
-  with app.app_context():
-    i = 0
-    while i < len(pages_to_parse):
-        current_item: parse_input = pages_to_parse[i]
-        url = current_item.link
-        text = ""
+    with app.app_context():
+        i = 0
+        while i < len(pages_to_parse):
+            current_item: parse_input = pages_to_parse[i]
+            url = current_item.link
+            text = ""
 
-        # Query to check if the document already exists
-        q_doc = db.session.query(models.Document).filter_by(link=url).first()
-
-        title = ""
-        source = ""
-
-        if current_item.type == parse_type.WEBPAGE:
-            result = scrape_webpage(url, current_item.source_id)
-            if not isinstance(result, dict):
-                problematic.append(problematic_file(url, result, time.asctime))
-                i += 1
-                continue
-            else:
-                text = result["text"]
-                title = result["title"]
-
-        # If the document has already been checked within a week, skip it.
-        if bool(q_doc):
-            if q_doc.last_time + 604800 > time.time():
-                i += 1
-                continue
-
-        dict_words = index(text.translate(translator).split())
-
-        if not bool(q_doc):
-            # Path that runs if document doesn't exist
-            new_document = models.Document()
-            new_document.title = title
-            new_document.source = current_item.source_id
-            new_document.intro = text[0:min(len(text)-1, 100)] + "..."
-            new_document.link = url
-            new_document.length = dict_words[1]
-            new_document.last_time = time.time()
-
-            db.session.add(new_document)
-            db.session.commit()
-            doc_id = new_document.document_id
-            for word in dict_words[0]:
-                freq = dict_words[0][word]
-                q_word = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
-                word_id = 0
-                if not bool(q_word):
-                    # Add the word to the database if it doesn't exist
-                    word_id = insert_new_word(word=word, frequency=freq)
-
+            # Query to check if the document already exists
+            q_doc = db.session.query(models.Document).filter_by(link=url).first()
+            title = ""
+            if current_item.type == parse_type.WEBPAGE:
+                result = scrape_webpage(url, current_item.source_id)
+                if not isinstance(result, dict):
+                    problematic.append(problematic_file(url, result, time.asctime))
+                    i += 1
+                    continue
                 else:
-                    # Update cumulative frequency of given word
-                    word_id = q_word.word_id
-                    q_word.frequency = q_word.frequency + freq
-                    db.session.commit()
+                    text = result["text"]
+                    title = result["title"]
 
-                insert_keyword_doc(doc_id, word_id, freq)
-        else:
-            # Path that runs if document does exist
-            doc_id = q_doc.document_id
+            # If the document has already been checked within a week, skip it.
+            if bool(q_doc):
+                if q_doc.last_time + 604800 > time.time():
+                    i += 1
+                    continue
 
-            # Used to store whatever words were previously indexed
-            # Is useful to know which word document pairs need to be removed
-            prev_connections = [x.word_id for x in q_doc.words]
+            dict_words = index(text.translate(translator).split())
 
-            for word in dict_words[0]:
-                freq = dict_words[0][word]
-                q_word = db.session.query(models.Keyword).filter_by(word=word).first()
-                word_id = None
+            if not bool(q_doc):
+                # Path that runs if document doesn't exist
+                new_document = models.Document()
+                new_document.title = title
+                new_document.source = current_item.source_id
+                new_document.intro = text[0:min(len(text)-1, 100)] + "..."
+                new_document.link = url
+                new_document.length = dict_words[1]
+                new_document.last_time = time.time()
 
-                if not bool(q_word):
-                    # Add the word to the database if it doesn't exist
-                    word_id = insert_new_word(word=word, frequency=freq)
-                else:
-                    # Update cumulative frequency of given word
-                    # If already connected, remove the connected frequency
-                    # so that total count stays accurate.
-                    word_id = q_word.word_id
-                    if word_id in prev_connections:
-                        # Used to keep track of which previous words are left
-                        # So that the connections that are left
-                        # can be deleted at end
-                        prev_connections.remove(word_id)
-                        q_connection = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=word_id).first()
-                        if q_connection.frequency == freq:
-                            continue
-                        q_word.frequency -= q_connection.frequency
-                        q_word.frequency += freq
-                        q_connection.frequency = freq
+                db.session.add(new_document)
+                db.session.commit()
+                doc_id = new_document.document_id
+                for word in dict_words[0]:
+                    freq = dict_words[0][word]
+                    q_word = db.session.query(models.Keyword).filter_by(word=word).first() # noqa
+                    word_id = 0
+                    if not bool(q_word):
+                        # Add the word to the database if it doesn't exist
+                        word_id = insert_new_word(word=word, frequency=freq)
+
+                    else:
+                        # Update cumulative frequency of given word
+                        word_id = q_word.word_id
+                        q_word.frequency = q_word.frequency + freq
                         db.session.commit()
 
-                insert_keyword_doc(doc_id, word_id, freq)
+                    insert_keyword_doc(doc_id, word_id, freq)
+            else:
+                # Path that runs if document does exist
+                doc_id = q_doc.document_id
 
-            # Delete indexed words not in document anymore
-            for conn_left in prev_connections:
-                conn = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=conn_left).first()
-                word = db.session.query(models.Keyword).filter_by(word_id=conn.word_id).first()
-                word.frequency -= conn.frequency
-                # Prune orphaned words not connected to any document
-                if word.frequency == 0:
-                    db.session.delete(word)
-                db.session.delete(conn)
+                # Used to store whatever words were previously indexed
+                # Is useful to know which word document pairs need to be removed
+                prev_connections = [x.word_id for x in q_doc.words]
 
-            q_doc.last_time = time.time()
-            db.session.commit()
-        i += 1
-    pages_to_parse.clear()
+                for word in dict_words[0]:
+                    freq = dict_words[0][word]
+                    q_word = db.session.query(models.Keyword).filter_by(word=word).first()
+                    word_id = None
+
+                    if not bool(q_word):
+                        # Add the word to the database if it doesn't exist
+                        word_id = insert_new_word(word=word, frequency=freq)
+                    else:
+                        # Update cumulative frequency of given word
+                        # If already connected, remove the connected frequency
+                        # so that total count stays accurate.
+                        word_id = q_word.word_id
+                        if word_id in prev_connections:
+                            # Used to keep track of which previous words are left
+                            # So that the connections that are left
+                            # can be deleted at end
+                            prev_connections.remove(word_id)
+                            q_connection = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=word_id).first()
+                            if q_connection.frequency == freq:
+                                continue
+                            q_word.frequency -= q_connection.frequency
+                            q_word.frequency += freq
+                            q_connection.frequency = freq
+                            db.session.commit()
+
+                    insert_keyword_doc(doc_id, word_id, freq)
+
+                # Delete indexed words not in document anymore
+                for conn_left in prev_connections:
+                    conn = db.session.query(models.KeywordDocument).filter_by(document_id=doc_id, word_id=conn_left).first()
+                    word = db.session.query(models.Keyword).filter_by(word_id=conn.word_id).first()
+                    word.frequency -= conn.frequency
+                    # Prune orphaned words not connected to any document
+                    if word.frequency == 0:
+                        db.session.delete(word)
+                    db.session.delete(conn)
+
+                q_doc.last_time = time.time()
+                db.session.commit()
+            i += 1
+        pages_to_parse.clear()
 
 
 def index(text_to_crawl: list) -> dict:
