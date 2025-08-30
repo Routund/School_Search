@@ -8,10 +8,6 @@ from app.routes import db
 from string import punctuation
 import easyocr
 from enum import Enum
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-import os
-from google_auth_oauthlib.flow import InstalledAppFlow
 import time
 
 # need to import wordnet
@@ -214,7 +210,7 @@ def scrape_webpage(url: str, source_id):
                 if href[0] == '/':
                     total_link = "".join([baseurl, href])
                     if total_link not in urllist:
-                        pages_to_parse.append(parse_input(link=total_link), source_id=source_id)
+                        pages_to_parse.append(parse_input(link=total_link, source_id=source_id))
             elif domain == source:
                 if href not in urllist:
                     pages_to_parse.append(parse_input(href, source_id=source_id))
@@ -228,26 +224,8 @@ def scrape_webpage(url: str, source_id):
         return e
 
 
-SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly"]
-
-
-def get_credentials():
-    creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json", SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open("token.json", "w") as token:
-                token.write(creds.to_json())
-    return creds
+def scrape_pdf(url: str, source_id):
+    pass
 
 
 # Helper function to add new words to the database

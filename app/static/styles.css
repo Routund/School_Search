@@ -9,17 +9,26 @@ body{
     margin-left: 0px;
     margin-right: 0px;
     overflow-x: hidden;
+    background-image: url('Background-cropped.svg');
+    background-size: cover;
+    background-attachment: fixed;
+    padding-right: 10%;
+    padding-top: 80px;
 }
 
 
 /* Styles for the top bar*/
 .topBaseBar{
+    top: 0px;
     text-align: left;
     min-width: max-content;
     color: white;
     background-color: var(--bhs_green_dark);
     height: 80px;
-    padding-left: 5px;
+    padding-left: 20px;
+    position: fixed;
+    z-index: 4;
+    width: 100%;
 }
 .bhsLogo{
     padding-top: 8px;
@@ -29,15 +38,19 @@ body{
     overflow: hidden;
 }
 
-#username_button{
+#username_section{
     float: right;
     height: 100%;
-    font-size: 30px;
+    text-align: center;
+}
+#username_button{
+    padding-right: 50px;
+    padding-left: 30px;
     background-color: transparent;
     color: white;
     border: none;
-    padding-right: 30px;
-    padding-left: 30px;
+    font-size: 30px;
+    height: 100%;
 }
 #username_button:hover{
     background-color: rgba(0, 0, 0, 0.171);
@@ -45,6 +58,32 @@ body{
 #username_button:focus{
     background-color: rgba(0, 0, 0, 0.271);
 }
+#top_bar_dropdown-content {
+    display: block;
+    background-color: #f9f9f9;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 3;
+    width: 100%;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    visibility: hidden;
+    position: relative;
+}
+#logout_link {
+    color: black;
+    text-decoration: none;
+}
+
+
+/* Styles for the home page */
+#homepage_content {
+    margin-left: 20px;
+    font-family: sans-serif;
+}
+
 
 /* Styles for the admin page*/
 .admin_page_title{
@@ -110,7 +149,7 @@ body{
     padding: 15px;
     margin: auto auto auto auto;
 }
-.admin_new_source_button{
+.admin_new_source_button, .admin_source_button{
     height: 15%;
     text-decoration: bold;
     text-align: left;
@@ -126,7 +165,7 @@ body{
     width: 100%;
 
 }
-.admin_new_source_button:hover{
+.admin_new_source_button:hover, .admin_source_button:hover{
     background: #a5a5a5;
 }
 #admin_new_source_form{
@@ -169,6 +208,9 @@ body{
     padding: 12px;
     visibility: hidden;
 }
+#source_display_url{
+    visibility: hidden;
+}
 
 
 /* Classes for result page*/
@@ -207,8 +249,11 @@ body{
     font-size: 50px;
     margin-bottom: 30px;
     border-bottom: solid #275276 5px;
+    margin-right: 10%;
 }
 .results_search_bar{
+    position: relative;
+    z-index: 0;
     background-color: none;
     width: 90%;
     border: none;
@@ -242,6 +287,7 @@ body{
     border-radius: 30px;
     font-weight: bold;
     border: none;
+    padding-right: 50%;
 
 }
 
@@ -258,8 +304,10 @@ body{
     pointer-events: none;
     transition: 0.3s;
     z-index: 1;
+    visibility: hidden;
 }
 #overlay.dimmed {
     opacity: 0.5;
     pointer-events: all;
+    visibility: visible;
 }

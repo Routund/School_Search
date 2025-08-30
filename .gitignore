@@ -5,5 +5,8 @@ include/
 lib/
 lib64/
 share/
-credentials.json
+authentication_creds.json
+authorization_creds.json
 token.json
+key.py
+__pycache__/key.cpython-312.pyc

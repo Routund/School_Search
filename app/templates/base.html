@@ -1,17 +1,29 @@
 <head>
     <!-- Source script for the google logins -->
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async></script>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {%if username is not none %}
+    <script type="text/javascript" src = "/static/dropdown.js">
+    </script>
+    {% endif %}
 </head>
+
 <body>
     <h1 class = "topBaseBar">
-        <a href = "/search"><img src = "/static/BHS.svg" class = "bhsLogo"></a>
-        <button id = "username_button">
-            Username
-        </button>
+        <a href = "http://localhost:5000/"><img src = "/static/BHS.svg" class = "bhsLogo"></a>
+        {%if username is not none %}
+        <div id="username_section">
+            <button id = "username_button" type="button">
+                {{username}}
+            </button>
+            <div id="top_bar_dropdown-content">
+                <a id="logout_link" href="/logout">Log out</a>
+            </div>
+        </div>
+        {% endif %}
     </h1>
-        {% block content %}
-
-        {% endblock%}
+    {% block content %}
+        
+    {% endblock %}
 </body>
