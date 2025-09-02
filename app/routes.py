@@ -1,10 +1,15 @@
 from app import app
 from flask import render_template, redirect, request, jsonify, session, abort
+from flask import url_for
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from math import log
 from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from json import loads as jsloads
+from google_auth_oauthlib.flow import InstalledAppFlow
 from key import key
 
 basedir = path.abspath(path.dirname(__file__))
@@ -76,8 +81,13 @@ def search_start():
 def okapi_search(query):
     if "user" not in session:
         abort(403)
-    if query is None:
+    if not bool(query):
         return redirect('/search')
+
+    creds = get_credentials()
+    if isinstance(creds, str):
+        return redirect(creds)
+
     # Saturation Parameter
     # (Sets how much a word appearing in a document improves it's score)
     k = 2
@@ -113,6 +123,18 @@ def okapi_search(query):
                         doc_query.source_obj.name,
                         doc_query.intro
                         ))
+
+    google_files = get_files_from_query(creds, ' '.join(set_words))
+
+    if bool(google_files):
+        for file in google_files:
+            results.append((
+                0.1,
+                file["link"],
+                file["name"],
+                "Google Drive",
+                "No Preview Available"
+            ))
 
     return render_template('results.html',
                            title="Search",
@@ -168,37 +190,158 @@ def logout():
     return redirect('/')
 
 
-@app.route("/login", methods =['POST'])
+@app.route("/login", methods=['POST'])
 def login():
     token = request.args.get("credential") or request.form.get("credential")
     if not token:
         return "Missing token", 400
 
     try:
-        idinfo = id_token.verify_oauth2_token(token,
-                                              grequests.Request(),
-                                              "436525077927-itvcusib54q0k3894qq7m3dta8nvunoi.apps.googleusercontent.com")
+        # Load credentials to get the client_id
+        with open('authentication2.json', 'r') as f:
+            auth_info = jsloads(f.read())
+            client_id = auth_info["web"].get("client_id")
+            if not client_id:
+                return abort(500)
+
+        # Validate the ID token with the client_id
+        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), client_id)
 
         # Extract claims
         email = idinfo.get("email")
         name = idinfo.get("name")
-        domain = idinfo.get("hd")  # will be None for normal Gmail accounts
+        domain = idinfo.get("hd")
 
-        # ✅ Enforce school domain
+        # Enforce school domain
         if domain != "burnside.school.nz" and email != "routundity@gmail.com":
-            return f"Access denied: {email} is not part of {"burnside.school.nz"}", 403
+            abort(403)
 
         # Save to session
         session["user"] = {
             "email": email,
-            "name": name,
-            "domain": domain
+            "name": name
         }
 
         return redirect("/search")
 
     except ValueError as e:
-        return f"Invalid token: {e}", 400
+        abort(400)
+    except FileNotFoundError:
+        abort(500)
+
+
+SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly",
+          "https://www.googleapis.com/auth/userinfo.profile",
+          "openid",
+          "https://www.googleapis.com/auth/userinfo.email"
+          ]
+
+
+def get_credentials():
+    creds = None
+    user = db.session.query(crawler.models.User).filter_by(email=session['user']['email']).first()
+    if bool(user):
+        # We load the json twice, once to remove \\'s
+        # And again to make it to a dict
+        creds_data = jsloads(user.creds)
+        creds = Credentials.from_authorized_user_info(creds_data, scopes=SCOPES)
+        # creds_dict = jsloads(user.creds)
+        # creds = Credentials.from_authorized_user_info(info={
+        #     'refresh_token': creds_dict['refresh_token'],
+        #     'client_id': creds_dict['client_id'],
+        #     'client_secret': creds_dict['client_secret']
+        #     },
+        #     scopes=SCOPES
+        #     )
+    else:
+        user = crawler.models.User()
+        db.session.add(user)
+        user.email = session['user']['email']
+        user.name = session['user']['name']
+
+        # This part handles the initial authorization for new or invalid creds
+    flow = InstalledAppFlow.from_client_secrets_file(
+        "authorization2.json", SCOPES,
+        redirect_uri=url_for('callback_route', _external=True)
+    )
+
+    if creds and creds.valid:
+        if creds.expired and creds.refresh_token:
+            creds.refresh(grequests.Request())
+            user.creds = creds.to_json()
+            db.session.commit()
+        return creds
+
+    # If we have an auth code, exchange it for tokens
+    if 'code' in request.args:
+        try:
+            flow.fetch_token(code=request.args.get('code'))
+            creds = flow.credentials
+            user.creds = creds.to_json()
+            db.session.commit()
+            return creds
+        except Exception as e:
+            # Handle token exchange errors gracefully
+            print(f"Error during token exchange: {e}")
+
+            return None
+    else:
+        # No auth code, so redirect the user to the authorization URL
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            approval_prompt='force'
+        )
+        print(f"Redirecting user to: {authorization_url}")
+        return authorization_url
+
+
+def get_files_from_query(creds, query):
+    try:
+        service = build("drive", "v3", credentials=creds)
+        files = []
+
+        # Call the Drive v3 API
+        results = (
+            service.files().list(
+                q=f"fullText contains '{query}'",
+                # and visibility = 'domainCanFind'
+                pageSize=10,
+                fields="nextPageToken, files(id, name, webViewLink)"
+                ).execute()
+        )
+
+        items = results.get("files", [])
+        nextPageToken = results.get("nextPageToken")
+
+        if not items:
+            print("No files found.")
+            return None
+        print("Files:")
+        for item in items:
+            new_file = {
+                        "name": item['name'],
+                        "link": item['webViewLink']
+                        }
+            files.append(new_file)
+            print(f"{item['name']} ({item['id']})")
+        return files
+    except Exception as error:
+        # TODO(developer) - Handle errors from drive API.
+        print(f"An error occurred: {error}")
+        return None
+
+
+@app.route('/callback')
+def callback_route():
+    # This route will get the 'code' from the URL query parameters
+    creds = get_credentials()
+
+    if creds and creds.valid:
+        return redirect('/search')
+    else:
+        # Handle the error case
+        abort(500)
 
 
 # Route to prevent Cross Site Scripting. Borrowed from

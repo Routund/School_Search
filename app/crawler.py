@@ -21,8 +21,10 @@ problematic = []
 translator = str.maketrans(' ', ' ', punctuation)
 reader = easyocr.Reader(['en'])
 
-threads = []
+parsing_threads = []
 stemmer = SnowballStemmer("english")
+
+searching_threads = []
 
 
 class problematic_file():
@@ -253,12 +255,20 @@ def insert_keyword_doc(doc, word, frequency):
 def new_source(url, source_id):
     parse_obj = parse_input(link=url, source_id=source_id)
     pages_to_parse.append(parse_obj)
-    if len(threads) > 0:
-        if threads[0].is_alive():
+    if len(parsing_threads) > 0:
+        if parsing_threads[0].is_alive():
             return
         else:
-            threads.clear()
-    t1 = threading.Thread(target=page_parsing_routine_thread)
-    threads.append(t1)
-    threads[0].start()
+            parsing_threads.clear()
+    t = threading.Thread(target=page_parsing_routine_thread)
+    parsing_threads.append(t)
+    parsing_threads[0].start()
     pass
+
+
+# def start_search(page_token, creds):
+#     t = threading.Thread(target=)
+
+
+# def search_drive():
+#     pass

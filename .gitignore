@@ -10,3 +10,5 @@ authorization_creds.json
 token.json
 key.py
 __pycache__/key.cpython-312.pyc
+authentication2.json
+authorization2.json

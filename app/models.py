@@ -54,3 +54,11 @@ class Source(db.Model):
     name = db.Column(db.String("50"))
     home_url = db.Column(db.String("80"))
     documents = db.relationship('Document', back_populates='source_obj')
+
+
+class User(db.Model):
+    __tablename__ = "User"
+
+    user_id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String("50"))
+    creds = db.Column(db.String("180"))
