@@ -72,4 +72,5 @@ function display_source(){
     url_display.textContent = url;
     title.style.visibility = "visible";
     url_display.style.visibility = "visible";
+    url_display.setAttribute("href",url)
 }

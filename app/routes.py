@@ -124,7 +124,7 @@ def okapi_search(query):
                         doc_query.intro
                         ))
 
-    google_files = get_files_from_query(creds, ' '.join(set_words))
+    google_files = get_files_from_query(creds, " ".join(query.split('_')))
 
     if bool(google_files):
         for file in google_files:
@@ -141,12 +141,6 @@ def okapi_search(query):
                            results=reversed(sorted(results)),
                            query=" ".join(query.split('_')),
                            username=session["user"]["name"])
-
-
-@app.route('/get_folders', methods=['POST'])
-def get_folders():
-    folder_list = crawler.get_folders_for_selection()
-    return jsonify({'folders': folder_list})
 
 
 @app.route('/new_source', methods=['POST'])
@@ -221,6 +215,7 @@ def login():
             "email": email,
             "name": name
         }
+        session["queries"] = {}
 
         return redirect("/search")
 
@@ -244,7 +239,7 @@ def get_credentials():
         # We load the json twice, once to remove \\'s
         # And again to make it to a dict
         creds_data = jsloads(user.creds)
-        creds = Credentials.from_authorized_user_info(creds_data, scopes=SCOPES)
+        creds = Credentials.from_authorized_user_info(creds_data, scopes=SCOPES) # noqa
         # creds_dict = jsloads(user.creds)
         # creds = Credentials.from_authorized_user_info(info={
         #     'refresh_token': creds_dict['refresh_token'],
@@ -265,12 +260,13 @@ def get_credentials():
         redirect_uri=url_for('callback_route', _external=True)
     )
 
-    if creds and creds.valid:
+    if creds:
         if creds.expired and creds.refresh_token:
             creds.refresh(grequests.Request())
             user.creds = creds.to_json()
             db.session.commit()
-        return creds
+        if creds.valid:
+            return creds
 
     # If we have an auth code, exchange it for tokens
     if 'code' in request.args:
@@ -300,6 +296,7 @@ def get_files_from_query(creds, query):
     try:
         service = build("drive", "v3", credentials=creds)
         files = []
+        page_token = session['queries'].get(query, None)
 
         # Call the Drive v3 API
         results = (
@@ -307,13 +304,15 @@ def get_files_from_query(creds, query):
                 q=f"fullText contains '{query}'",
                 # and visibility = 'domainCanFind'
                 pageSize=10,
-                fields="nextPageToken, files(id, name, webViewLink)"
+                fields="nextPageToken, files(id, name, webViewLink)",
+                pageToken=page_token
                 ).execute()
         )
 
         items = results.get("files", [])
         nextPageToken = results.get("nextPageToken")
-
+        session['queries'][query] = nextPageToken
+        session.modified = True
         if not items:
             print("No files found.")
             return None
@@ -332,6 +331,34 @@ def get_files_from_query(creds, query):
         return None
 
 
+@app.route('/files_extend', methods=['POST'])
+def fetch_files_extended():
+    data = request.get_json()
+    query = data.get('query')
+    creds = get_credentials()
+    if isinstance(creds, str):
+        return jsonify({'status': 'error'})
+    # Check if there is a valid next page to get files from
+    if session['queries'].get(query, None) is None:
+        return jsonify({'status': 'error'})
+    google_files = get_files_from_query(creds, " ".join(query.split('_')))
+    files = []
+    if bool(google_files):
+        for file in google_files:
+            files.append((
+                0.1,
+                file["link"],
+                file["name"],
+                "Google Drive",
+                "No Preview Available"
+            ))
+    return jsonify({'status': 'success',
+                   'files': files
+                    })
+
+
+
+
 @app.route('/callback')
 def callback_route():
     # This route will get the 'code' from the URL query parameters
@@ -344,7 +371,7 @@ def callback_route():
         abort(500)
 
 
-# Route to prevent Cross Site Scripting. Borrowed from
+# Function to prevent Cross Site Scripting. Borrowed from
 # https://stackoverflow.com/questions/63290047/flask-csp-content-security-policy-best-practice-against-attack-such-as-cross
 @app.after_request
 def add_security_headers(resp):

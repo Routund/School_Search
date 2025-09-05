@@ -29,6 +29,8 @@ body{
     position: fixed;
     z-index: 4;
     width: 100%;
+    padding-top: 0px;
+    margin-top: 0px;
 }
 .bhsLogo{
     padding-top: 8px;
@@ -84,7 +86,16 @@ body{
     font-family: sans-serif;
     height: 100%;
 }
-
+#g_id_onload{
+    visibility: hidden;
+}
+#gsi{
+    visibility: hidden;
+}
+#home_title{
+    text-align: center;
+    font-size: 50px;
+}
 
 /* Styles for the admin page*/
 .admin_page_title{
@@ -149,6 +160,7 @@ body{
     overflow-y: scroll;
     padding: 15px;
     margin: auto auto auto auto;
+    text-align: left;
 }
 .admin_new_source_button, .admin_source_button{
     height: 15%;
@@ -184,9 +196,11 @@ body{
     top: 25%;
     bottom: 25%;
     font-size: 20px;
+    pointer-events: none;
 }
 #admin_new_source_form.shown{
     opacity: 1.0;
+    pointer-events: all;
 }
 #admin_new_source_form_input_grid{
     margin-left: auto;
@@ -211,6 +225,10 @@ body{
 }
 #source_display_url{
     visibility: hidden;
+}
+#source_display_title{
+    visibility: hidden;
+    font-size: 40px;
 }
 
 
@@ -280,6 +298,7 @@ body{
     display: block;
     margin:auto;
     margin-top: 390px;
+    margin-left: 20px;
     padding: 25px;
     background-color: #D9D9D9;
     color: #275276;
@@ -288,8 +307,20 @@ body{
     border-radius: 30px;
     font-weight: bold;
     border: none;
-    padding-right: 50%;
+}
+#loading_results{
+    text-align: center;
+    height: 100px;
+    padding-top: 30px;
+    visibility: hidden;
+}
 
+/* Error page styles*/
+#error_text {
+    font-size: 50px;
+    text-align: center;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    padding-top: 20px;
 }
 
 /* General use */
@@ -312,3 +343,4 @@ body{
     pointer-events: all;
     visibility: visible;
 }
+

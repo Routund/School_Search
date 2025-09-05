@@ -1,5 +1,6 @@
 from nltk.stem import SnowballStemmer
 from urllib import request, parse
+import requests as filerequest
 from bs4 import BeautifulSoup
 import threading
 from app import app
@@ -8,7 +9,12 @@ from app.routes import db
 from string import punctuation
 import easyocr
 from enum import Enum
+from io import BytesIO
 import time
+from pdf2image import convert_from_bytes
+from os import SEEK_END
+from numpy import array
+from pypdf import PdfReader
 
 # need to import wordnet
 # Uncomment lines below when running the first time
@@ -43,7 +49,7 @@ class parse_type(Enum):
 
 
 class parse_input():
-    def __init__(self, link, source_id, type=parse_type.WEBPAGE, pdf_bytes=None):
+    def __init__(self, link, source_id, type=parse_type.WEBPAGE, pdf_bytes=None): # noqa
         self.link = link
         self.type = type
         self.pdf_bytes = pdf_bytes
@@ -59,18 +65,30 @@ def page_parsing_routine_thread():
             text = ""
 
             # Query to check if the document already exists
-            q_doc = db.session.query(models.Document).filter_by(link=url).first()
+            q_doc = db.session.query(models.Document).filter_by(link=url).first() # noqa
             title = ""
             if current_item.type == parse_type.WEBPAGE:
                 result = scrape_webpage(url, current_item.source_id)
                 if not isinstance(result, dict):
-                    problematic.append(problematic_file(url, result, time.asctime))
+                    problematic.append(problematic_file(url,
+                                                        result,
+                                                        time.asctime))
                     i += 1
                     continue
                 else:
                     text = result["text"]
                     title = result["title"]
-
+            elif current_item.type == parse_type.PDF:
+                result = scrape_pdf(url, current_item.source_id)
+                if not isinstance(result, dict):
+                    problematic.append(problematic_file(url,
+                                                        result,
+                                                        time.asctime))
+                    i += 1
+                    continue
+                else:
+                    text = result["text"]
+                    title = result["title"]
             # If the document has already been checked within a week, skip it.
             if bool(q_doc):
                 if q_doc.last_time + 604800 > time.time():
@@ -175,7 +193,7 @@ def index(text_to_crawl: list) -> dict:
         lemma = stemmer.stem(key)
         word_freqs[lemma] = word_freqs.get(lemma, 0) + raw_word_freqs[key]
 
-    print(word_freqs)
+    # print(word_freqs)
 
     return (word_freqs, len(raw_word_freqs.keys()))
 
@@ -212,22 +230,71 @@ def scrape_webpage(url: str, source_id):
                 if href[0] == '/':
                     total_link = "".join([baseurl, href])
                     if total_link not in urllist:
-                        pages_to_parse.append(parse_input(link=total_link, source_id=source_id))
+                        add_link(total_link, source_id)
             elif domain == source:
                 if href not in urllist:
-                    pages_to_parse.append(parse_input(href, source_id=source_id))
+                    add_link(href, source_id)
 
         return {
             "text": str_clean,
             "title": soup.title.text,
-            "source": source}
+            }
     except Exception as e:
         print(e)
         return e
 
 
+reader = easyocr.Reader(['en'])
+
+
 def scrape_pdf(url: str, source_id):
-    pass
+    response = filerequest.get(url)
+    file_bytes = BytesIO(response.content)
+    pdf_image = convert_from_bytes(file_bytes.read())
+    total_text = ""
+    for page_number, page_data in enumerate(pdf_image):
+        pdf_array = array(page_data)
+        results = reader.readtext(pdf_array, detail=0)
+        for detected_string in results:
+            total_text = total_text + " " + detected_string
+    file_bytes.seek(0, SEEK_END)
+    pypdfReader = PdfReader(file_bytes)
+    return {
+        "text": total_text,
+        "title": pypdfReader.metadata.title
+    }
+
+
+content_type_headers = [
+    'content_type',
+    'content-type',
+]
+
+
+def add_link(link, source_id):
+    try:
+        # Check the headers of a link to see if data type is parsable
+        # ie. a PDF, an HTML page, or an unsupported type
+        header_test = request.urlopen(link)
+        header_list = header_test.headers.items()
+        final_type = None
+        for header in header_list:
+            if header[0].lower() in content_type_headers:
+                content = header[1]
+                print(content)
+                if "text/html" in content:
+                    final_type = parse_type.WEBPAGE
+                    break
+                if 'application/pdf' in content:
+                    final_type = parse_type.PDF
+                    break
+        if not bool(final_type):
+            return
+        pages_to_parse.append(parse_input(link=link,
+                                          source_id=source_id,
+                                          type=final_type))
+    except Exception as e:
+        print(e)
 
 
 # Helper function to add new words to the database
@@ -253,8 +320,7 @@ def insert_keyword_doc(doc, word, frequency):
 
 
 def new_source(url, source_id):
-    parse_obj = parse_input(link=url, source_id=source_id)
-    pages_to_parse.append(parse_obj)
+    add_link(url, source_id)
     if len(parsing_threads) > 0:
         if parsing_threads[0].is_alive():
             return
