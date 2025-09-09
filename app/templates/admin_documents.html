@@ -31,6 +31,12 @@
             <a id="source_display_url">
                 
             </a>
+            <button id="source_reparse">
+                Re-index source
+            </button>
+            <div id="admin_source_succesful_reparse">
+                Re-Indexing started succesfully! Note: Re-indexing will not work if the last indexing was less than an hour ago.
+            </div>
     </div>
 </div>
 
@@ -52,6 +58,9 @@
         </div>
         <button id="confirm_new_source" type="button"> INSERT </button>
         <div id="admin_source_succesful_insert">Source uploaded succesfully! It should take 10 minutes to an hour to fully crawl depending on the size of the website</div>
+        <div id = "loading_results">
+            <img src = "/static/loading.gif" height="50px">
+        </div>
     </form>
 </div>
 

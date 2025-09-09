@@ -78,8 +78,15 @@ def page_parsing_routine_thread():
                 else:
                     text = result["text"]
                     title = result["title"]
-            elif current_item.type == parse_type.PDF:
-                result = scrape_pdf(url, current_item.source_id)
+
+            # If the document has already been checked within the last hour, skip it.
+            if bool(q_doc):
+                if q_doc.last_time + 3600 > time.time():
+                    i += 1
+                    continue
+
+            if current_item.type == parse_type.PDF:
+                result = scrape_pdf(url)
                 if not isinstance(result, dict):
                     problematic.append(problematic_file(url,
                                                         result,
@@ -89,13 +96,15 @@ def page_parsing_routine_thread():
                 else:
                     text = result["text"]
                     title = result["title"]
-            # If the document has already been checked within a week, skip it.
-            if bool(q_doc):
-                if q_doc.last_time + 604800 > time.time():
-                    i += 1
-                    continue
 
             dict_words = index(text.translate(translator).split())
+            dict_title = index(title.translate(translator).split())
+
+            title_factor = int(dict_words[1] / 5) + 1
+            for word in dict_title[0].keys():
+                dict_words[0][word] = dict_words[0].get(word, 0) + title_factor
+
+
 
             if not bool(q_doc):
                 # Path that runs if document doesn't exist
@@ -158,6 +167,9 @@ def page_parsing_routine_thread():
                             q_word.frequency += freq
                             q_connection.frequency = freq
                             db.session.commit()
+                        else:
+                            q_word.frequency = q_word.frequency + freq
+                            db.session.commit()
 
                     insert_keyword_doc(doc_id, word_id, freq)
 
@@ -172,9 +184,16 @@ def page_parsing_routine_thread():
                     db.session.delete(conn)
 
                 q_doc.last_time = time.time()
-                db.session.commit()
+                db.session.commit(),
             i += 1
         pages_to_parse.clear()
+
+
+alphanumeric = [
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'
+]
 
 
 def index(text_to_crawl: list) -> dict:
@@ -190,8 +209,14 @@ def index(text_to_crawl: list) -> dict:
     }
 
     for key in raw_word_freqs.keys():
-        lemma = stemmer.stem(key)
-        word_freqs[lemma] = word_freqs.get(lemma, 0) + raw_word_freqs[key]
+        list_key = list(key)
+        for i in range(len(list_key)):
+            if list_key[i] not in alphanumeric:
+                list_key[i] = ''
+        stripped_key = "".join(list_key)
+        if bool(stripped_key) and len(stripped_key) < 13:
+            lemma = stemmer.stem(stripped_key)
+            word_freqs[lemma] = word_freqs.get(lemma, 0) + raw_word_freqs[key]
 
     # print(word_freqs)
 
@@ -203,7 +228,8 @@ def scrape_webpage(url: str, source_id):
         link = request.Request(url)
         # Get full HTML of a given website
         response = request.urlopen(link)
-        source = parse.urlsplit(url).netloc
+        source_split = parse.urlsplit(url)
+        source_split = source_split._replace(path="", query="", fragment="")
         htmlbytes = response.read()
         htmlstr = htmlbytes.decode("utf8")
 
@@ -215,9 +241,7 @@ def scrape_webpage(url: str, source_id):
         # add them to list of links to parse
         # (Check for domain to avoid accidentaly scraping the entire web)
         anchors = soup.find_all('a')
-        baseurl: parse.SplitResult = parse.urlsplit(url)
-        baseurl = baseurl._replace(path="", query="", fragment="")
-        baseurl = parse.urlunsplit(baseurl)
+        baseurl = db.session.query(models.Source).filter_by(source_id=source_id).first().home_url
         # urllist is a list of all pages previously parsed, this is present
         # to prevent repeat links being added to parse
         urllist = [x.link for x in pages_to_parse]
@@ -228,12 +252,15 @@ def scrape_webpage(url: str, source_id):
                 # If no domain is present, check if the href is a relative link
                 # And not a link to a section on the page
                 if href[0] == '/':
-                    total_link = "".join([baseurl, href])
+                    source_split = source_split._replace(path=href)
+                    total_link = parse.urlunsplit(source_split)
                     if total_link not in urllist:
                         add_link(total_link, source_id)
-            elif domain == source:
+                        urllist.append(total_link)
+            elif baseurl in href:
                 if href not in urllist:
                     add_link(href, source_id)
+                    urllist.append(href)
 
         return {
             "text": str_clean,
@@ -247,21 +274,34 @@ def scrape_webpage(url: str, source_id):
 reader = easyocr.Reader(['en'])
 
 
-def scrape_pdf(url: str, source_id):
+def scrape_pdf(url: str):
     response = filerequest.get(url)
     file_bytes = BytesIO(response.content)
-    pdf_image = convert_from_bytes(file_bytes.read())
-    total_text = ""
-    for page_number, page_data in enumerate(pdf_image):
-        pdf_array = array(page_data)
-        results = reader.readtext(pdf_array, detail=0)
-        for detected_string in results:
-            total_text = total_text + " " + detected_string
     file_bytes.seek(0, SEEK_END)
     pypdfReader = PdfReader(file_bytes)
+    total_text = ""
+    for j in range(len(pypdfReader.pages)):
+        total_text = total_text + " " + pypdfReader.pages[j].extract_text(0)
+
+    if bool(pypdfReader.metadata):
+        if bool(pypdfReader.metadata.title):
+            return {
+                "text": total_text,
+                "title": pypdfReader.metadata.title
+            }
+
+    # this path runs when the metadata is empty, or contains no title
+    # it creates a title based off of the url
+    url_title = []
+    for i in reversed(range(len(url))):
+        if url[i] != '/':
+            url_title.insert(0, url[i])
+        else:
+            break
+    url_title = "".join(url_title)
     return {
         "text": total_text,
-        "title": pypdfReader.metadata.title
+        "title": url_title
     }
 
 
@@ -281,7 +321,6 @@ def add_link(link, source_id):
         for header in header_list:
             if header[0].lower() in content_type_headers:
                 content = header[1]
-                print(content)
                 if "text/html" in content:
                     final_type = parse_type.WEBPAGE
                     break
@@ -290,6 +329,7 @@ def add_link(link, source_id):
                     break
         if not bool(final_type):
             return
+        print(link)
         pages_to_parse.append(parse_input(link=link,
                                           source_id=source_id,
                                           type=final_type))
@@ -310,6 +350,8 @@ def insert_new_word(word, frequency):
 
 # Helper function to add new connections to database
 def insert_keyword_doc(doc, word, frequency):
+    if doc is None or word is None:
+        return
     with app.app_context():
         KeywordDocument = models.KeywordDocument()
         KeywordDocument.document_id = doc
@@ -330,11 +372,3 @@ def new_source(url, source_id):
     parsing_threads.append(t)
     parsing_threads[0].start()
     pass
-
-
-# def start_search(page_token, creds):
-#     t = threading.Thread(target=)
-
-
-# def search_drive():
-#     pass

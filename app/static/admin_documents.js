@@ -11,6 +11,7 @@ window.onload=function() {
     var new_popup = document.getElementsByClassName('admin_new_source_button');
     new_popup[0].addEventListener('click', new_source_popup);
     document.getElementById("confirm_new_source").addEventListener('click', send_new_source)
+    document.getElementById('source_reparse').addEventListener('click', reparse)
 }
 
 function key_event(e) {
@@ -47,6 +48,7 @@ function send_new_source(){
         console.debug("invalid url");
         return;
     }
+    document.getElementById('loading_results').style.visibility = "visible"
     $.ajax({ 
         url: '/new_source', 
         type: 'POST', 
@@ -54,9 +56,11 @@ function send_new_source(){
         data: JSON.stringify({ 'url' : encodeURI(url), 'name' : source_name }),
         success: function(response) {
             document.getElementById("admin_source_succesful_insert").style.visibility="visible";
+            document.getElementById('loading_results').style.visibility = "hidden"
         },
         error: function(msg){
             console.debug(msg.response);
+            document.getElementById('loading_results').style.visibility = "hidden"
         }
     });
 }
@@ -68,9 +72,30 @@ function display_source(){
     current_id = parseInt(id);
     var title = document.getElementById("source_display_title");
     var url_display = document.getElementById("source_display_url");
+    var reparse = document.getElementById("source_reparse");
+    var reparse_success = document.getElementById("admin_source_succesful_reparse");
     title.textContent = name;
-    url_display.textContent = url;
+    url_display.textContent = "URL: ".concat(url);
     title.style.visibility = "visible";
     url_display.style.visibility = "visible";
+    reparse.style.visibility = "visible";
+    reparse_success.style.visibility = "hidden";
     url_display.setAttribute("href",url)
+}
+
+function reparse(){
+    if (current_id != -1){
+        $.ajax({ 
+            url: '/reparse', 
+            type: 'POST', 
+            contentType: 'application/json', 
+            data: JSON.stringify({ 'source_id': current_id }),
+            success: function(response) {
+                document.getElementById("admin_source_succesful_reparse").style.visibility="visible";
+            },
+            error: function(msg){
+                console.debug(msg.response);
+            }
+        });
+    }
 }

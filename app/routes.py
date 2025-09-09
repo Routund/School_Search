@@ -47,7 +47,7 @@ def bad_request(error):
 @app.errorhandler(500)
 def general_error(error):
     return render_template('Errors.html',
-                           Error='''Something seemed to have gone wrong'''), 500
+                           Error='Something seemed to have gone wrong'), 500
 
 
 @app.route('/')
@@ -59,13 +59,22 @@ def home():
 
 @app.route('/admin/documents', methods=['POST', 'GET'])
 def admin():
+
     if "user" not in session:
         abort(403)
+
+    # Get list of all current sources
     source_list = db.session.query(crawler.models.Source).all()
     ids = [x.source_id for x in source_list]
     names = [x.name for x in source_list]
     urls = [x.home_url for x in source_list]
-    return render_template('admin_documents.html', ids=ids, names=names, urls=urls)
+
+    return render_template('admin_documents.html', ids=ids, names=names, urls=urls) # noqa
+
+
+@app.route('/search/')
+def search_redirecter():
+    return redirect('/search')
 
 
 @app.route('/search')
@@ -77,8 +86,12 @@ def search_start():
 
 # Okapi BM25 search based of Medium article by Emma Park
 # https://medium.com/@readwith_emma/understanding-okapi-bm25-document-ranking-algorithm-70d81adab001
+# parameters such as k and idf are taken
+# from the mathematical formula for okapi search
 @app.route('/search/<query>')
 def okapi_search(query):
+    if len(query) > 100:
+        abort(400)
     if "user" not in session:
         abort(403)
     if not bool(query):
@@ -99,7 +112,7 @@ def okapi_search(query):
 
     for word in set_words:
         # lemma is root word of word e. steamed -> steam
-        lemma = crawler.stemmer.stem(word.lower().translate(crawler.translator))
+        lemma = crawler.stemmer.stem(word.lower().translate(crawler.translator)) # noqa
         word_obj = db.session.query(crawler.models.Keyword).filter_by(word=lemma).first()  # noqa
         if bool(word_obj):
             # freq_total = word_obj.frequency
@@ -136,9 +149,11 @@ def okapi_search(query):
                 "No Preview Available"
             ))
 
+    results = list(reversed(sorted(results)))
+
     return render_template('results.html',
                            title="Search",
-                           results=reversed(sorted(results)),
+                           results=results,
                            query=" ".join(query.split('_')),
                            username=session["user"]["name"])
 
@@ -149,11 +164,11 @@ def new_source():
     url = data.get('url')
     name = data.get('name')
 
-    q_source = db.session.query(crawler.models.Source).filter_by(name=name).first()
+    q_source = db.session.query(crawler.models.Source).filter_by(name=name).first() # noqa
     if bool(q_source):
         return jsonify({'status': 'name_present'})
 
-    q_source = db.session.query(crawler.models.Source).filter_by(home_url=url).first()
+    q_source = db.session.query(crawler.models.Source).filter_by(home_url=url).first() # noqa
     if bool(q_source):
         return jsonify({'status': 'url_present'})
 
@@ -199,7 +214,7 @@ def login():
                 return abort(500)
 
         # Validate the ID token with the client_id
-        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), client_id)
+        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), client_id) # noqa
 
         # Extract claims
         email = idinfo.get("email")
@@ -220,6 +235,7 @@ def login():
         return redirect("/search")
 
     except ValueError as e:
+        print(e)
         abort(400)
     except FileNotFoundError:
         abort(500)
@@ -234,7 +250,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly",
 
 def get_credentials():
     creds = None
-    user = db.session.query(crawler.models.User).filter_by(email=session['user']['email']).first()
+    user = db.session.query(crawler.models.User).filter_by(email=session['user']['email']).first() # noqa
     if bool(user):
         # We load the json twice, once to remove \\'s
         # And again to make it to a dict
@@ -357,6 +373,17 @@ def fetch_files_extended():
                     })
 
 
+@app.route('/reparse', methods=['POST'])
+def reparse():
+    data = request.get_json()
+    try:
+        source_id = data.get('source_id')
+        url = db.session.query(crawler.models.Source).filter_by(source_id=source_id).first().home_url  # noqa
+        crawler.new_source(source_id=source_id, url=url)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        print(e)
+        return jsonify({'status': 'error'})
 
 
 @app.route('/callback')
@@ -377,7 +404,7 @@ def callback_route():
 def add_security_headers(resp):
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' https://accounts.google.com/gsi/client https://code.jquery.com/jquery-3.6.0.min.js;"
+        "script-src 'self' https://accounts.google.com/gsi/client https://code.jquery.com/jquery-3.6.0.min.js;" # noqa
         "frame-src https://accounts.google.com/gsi/;"
         "connect-src 'self' https://accounts.google.com/gsi/; "
         "img-src 'self' https://accounts.google.com/gsi/;"
