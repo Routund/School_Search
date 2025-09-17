@@ -8,9 +8,11 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from sqlalchemy import func
 from json import loads as jsloads
 from google_auth_oauthlib.flow import InstalledAppFlow
 from key import key
+import requests as pyrequest
 
 basedir = path.abspath(path.dirname(__file__))
 db = SQLAlchemy()
@@ -105,14 +107,18 @@ def okapi_search(query):
     # (Sets how much a word appearing in a document improves it's score)
     k = 2
 
-    # Make query set to avoid duplicate work for the same word
-    set_words = set(query.split('_'))
+    # Normalization Parameter
+    # Sets how much to boost documents that have a shorter lengthx
+    b = 0.2
+
+    dict_words = crawler.index(query.replace('_', ' '))
     n_docs = db.session.query(crawler.models.Document).count()
     document_rankings = {}
 
-    for word in set_words:
-        # lemma is root word of word e. steamed -> steam
-        lemma = crawler.stemmer.stem(word.lower().translate(crawler.translator)) # noqa
+    avg_doc_length = db.session.query(func.avg(crawler.models.Document.length)).scalar()
+    total_idf = 0
+    # lemma is root word of word e. steamed -> steam
+    for lemma in dict_words[0].keys():
         word_obj = db.session.query(crawler.models.Keyword).filter_by(word=lemma).first()  # noqa
         if bool(word_obj):
             # freq_total = word_obj.frequency
@@ -121,12 +127,16 @@ def okapi_search(query):
             # Inverse Document Frequency
             # It measures specificity of word across docs
             idf = log((n_docs - n_with_word + 0.5)/(n_with_word + 0.5)+1)
+            total_idf += idf
             for doc in connections.all():
-                frequency = doc.frequency
-                score = idf * frequency * (k+1) / ((frequency + k))
+                freq = doc.frequency
+                norm_factor = ((1-b) * b * doc.Document.length/avg_doc_length)
+                score = idf * freq * (k+1) / ((freq + k) * norm_factor)
                 doc_id = doc.document_id
-                document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score # noqa
+                document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score * dict_words[0][lemma]# noqa
+    
     results = []
+    sources = set()
 
     for doc_id in document_rankings.keys():
         doc_query = db.session.query(crawler.models.Document).filter_by(document_id=doc_id).first() # noqa
@@ -136,13 +146,16 @@ def okapi_search(query):
                         doc_query.source_obj.name,
                         doc_query.intro
                         ))
+        sources.add(doc_query.source_obj.name)
 
     google_files = get_files_from_query(creds, " ".join(query.split('_')))
 
     if bool(google_files):
-        for file in google_files:
+        sources.add("Google Drive")
+        for i in range(len(google_files)):
+            file = google_files[i]
             results.append((
-                0.1,
+                0.1 + (20-i)/4*total_idf,
                 file["link"],
                 file["name"],
                 "Google Drive",
@@ -155,7 +168,8 @@ def okapi_search(query):
                            title="Search",
                            results=results,
                            query=" ".join(query.split('_')),
-                           username=session["user"]["name"])
+                           username=session["user"]["name"],
+                           sources=list(sources))
 
 
 @app.route('/new_source', methods=['POST'])
@@ -184,61 +198,10 @@ def new_source():
     return jsonify({'status': 'success'})
 
 
-# @app.route('/insert_pdf', methods=['POST'])
-# def insert_pdf():
-#     if request.method == 'POST':
-#         pdf = request.files['pdf']
-#         url = request.form.get('url')
-#         crawler.start_scraping_documents([(pdf, 2, url)])
-#         return redirect('/')
-
-
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect('/')
-
-
-@app.route("/login", methods=['POST'])
-def login():
-    token = request.args.get("credential") or request.form.get("credential")
-    if not token:
-        return "Missing token", 400
-
-    try:
-        # Load credentials to get the client_id
-        with open('authentication2.json', 'r') as f:
-            auth_info = jsloads(f.read())
-            client_id = auth_info["web"].get("client_id")
-            if not client_id:
-                return abort(500)
-
-        # Validate the ID token with the client_id
-        idinfo = id_token.verify_oauth2_token(token, grequests.Request(), client_id) # noqa
-
-        # Extract claims
-        email = idinfo.get("email")
-        name = idinfo.get("name")
-        domain = idinfo.get("hd")
-
-        # Enforce school domain
-        if domain != "burnside.school.nz" and email != "routundity@gmail.com":
-            abort(403)
-
-        # Save to session
-        session["user"] = {
-            "email": email,
-            "name": name
-        }
-        session["queries"] = {}
-
-        return redirect("/search")
-
-    except ValueError as e:
-        print(e)
-        abort(400)
-    except FileNotFoundError:
-        abort(500)
 
 
 SCOPES = ["https://www.googleapis.com/auth/drive.metadata.readonly",
@@ -256,23 +219,12 @@ def get_credentials():
         # And again to make it to a dict
         creds_data = jsloads(user.creds)
         creds = Credentials.from_authorized_user_info(creds_data, scopes=SCOPES) # noqa
-        # creds_dict = jsloads(user.creds)
-        # creds = Credentials.from_authorized_user_info(info={
-        #     'refresh_token': creds_dict['refresh_token'],
-        #     'client_id': creds_dict['client_id'],
-        #     'client_secret': creds_dict['client_secret']
-        #     },
-        #     scopes=SCOPES
-        #     )
     else:
-        user = crawler.models.User()
-        db.session.add(user)
-        user.email = session['user']['email']
-        user.name = session['user']['name']
+        abort(400)
 
         # This part handles the initial authorization for new or invalid creds
     flow = InstalledAppFlow.from_client_secrets_file(
-        "authorization2.json", SCOPES,
+        "authorization_creds.json", SCOPES,
         redirect_uri=url_for('callback_route', _external=True)
     )
 
@@ -317,11 +269,12 @@ def get_files_from_query(creds, query):
         # Call the Drive v3 API
         results = (
             service.files().list(
-                q=f"fullText contains '{query}'",
+                q=f"(fullText contains '{query}' or name contains '{query}')",
                 # and visibility = 'domainCanFind'
-                pageSize=10,
+                pageSize=20,
                 fields="nextPageToken, files(id, name, webViewLink)",
-                pageToken=page_token
+                pageToken=page_token,
+                corpora='domain'
                 ).execute()
         )
 
@@ -386,16 +339,80 @@ def reparse():
         return jsonify({'status': 'error'})
 
 
-@app.route('/callback')
+@app.route('/callback', methods=['POST', 'GET'])
 def callback_route():
-    # This route will get the 'code' from the URL query parameters
-    creds = get_credentials()
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        "authorization_creds.json", SCOPES,
+        redirect_uri=url_for('callback_route', _external=True)
+    )
+
+    creds = None
+
+    if 'code' in request.args:
+        try:
+            flow.fetch_token(code=request.args.get('code'))
+            creds = flow.credentials
+            db.session.commit()
+        except Exception as e:
+            # Handle token exchange errors gracefully
+            print(f"Error during token exchange: {e}")
+            abort(500)
+    else:
+        abort(500)
 
     if creds and creds.valid:
+        # Get the access token from the credentials object
+        access_token = creds.token
+
+        # Make the API call to Google's User Info endpoint
+        userinfo_endpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        response = pyrequest.get(userinfo_endpoint, headers=headers)
+
+        user_info = response.json()
+        email = user_info.get("email")
+        name = user_info.get("name")
+
+        # Save the user info to the session
+        session["user"] = {
+            "email": email,
+            "name": name
+        }
+
+        user = db.session.query(crawler.models.User).filter_by(email=email).first()
+        if not bool(user):
+            user = crawler.models.User()
+            db.session.add(user)
+            user.email = email
+            user.name = name
+            user.creds = creds.to_json()
+            db.session.commit()
+
+        print(f"Successfully retrieved user info for: {name} ({email})")
         return redirect('/search')
-    else:
-        # Handle the error case
-        abort(500)
+
+    # If something went wrong, handle the failure
+    print("Authentication failed or could not retrieve user info.")
+    return "Authentication failed.", 400
+
+
+@app.route('/login')
+def login():
+    flow = InstalledAppFlow.from_client_secrets_file(
+        "authorization_creds.json", SCOPES,
+        redirect_uri=url_for('callback_route', _external=True)
+    )
+
+    authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            approval_prompt='force'
+        )
+    print(f"Redirecting user to: {authorization_url}")
+    return redirect(authorization_url)
 
 
 # Function to prevent Cross Site Scripting. Borrowed from

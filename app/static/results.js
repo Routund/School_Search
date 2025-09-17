@@ -3,9 +3,14 @@ var searchBar = document.getElementById("search_bar");
 searchBar.addEventListener("keypress", function(event) {
     console.debug("AIAIAI")
     if (event.key === "Enter") {
-        search();  // call your search function
+        search();
     }
+    change_filter_list
 });
+var filter = document.getElementById('filter_search_bar_icon');
+filter.addEventListener('click', toggle_filter_dialogue);
+var filter_apply = document.getElementById('filter_apply');
+filter_apply.addEventListener('click');
 });
 
 function search(){
@@ -16,6 +21,32 @@ function search(){
     const words = query.split(" ");
     var urlString= words.join("_");
     window.location.href= "/search/".concat(urlString);
+}
+
+var dimmed = true
+
+function toggle_filter_dialogue(){
+    if (!dimmed){
+        dimmed = true;
+        var overlay = document.getElementById('overlay');
+        var dialogue_box = document.getElementById('filter_dialogue');
+        overlay.classList.add('dimmed');
+        dialogue_box.classList.add('shown');
+    }
+    else{
+        dimmed = false;
+        var overlay = document.getElementById('overlay');
+        var dialogue_box = document.getElementById('filter_dialogue');
+        overlay.classList.remove('dimmed');
+        dialogue_box.classList.remove('shown');
+    }
+}
+
+
+
+function change_filter_list(){
+    var source_boxes = document.getElementsByClassName('source_checkbox');
+    toggle_filter_dialogue();
 }
 
 $(window).scroll(function() {

@@ -97,14 +97,12 @@ def page_parsing_routine_thread():
                     text = result["text"]
                     title = result["title"]
 
-            dict_words = index(text.translate(translator).split())
-            dict_title = index(title.translate(translator).split())
+            dict_words = index(text)
+            dict_title = index(title)
 
-            title_factor = int(dict_words[1] / 5) + 1
+            title_factor = int(dict_words[1] / 3) + 1
             for word in dict_title[0].keys():
                 dict_words[0][word] = dict_words[0].get(word, 0) + title_factor
-
-
 
             if not bool(q_doc):
                 # Path that runs if document doesn't exist
@@ -196,12 +194,15 @@ alphanumeric = [
 ]
 
 
-def index(text_to_crawl: list) -> dict:
+def index(text_to_crawl: str) -> dict:
+
+    list_words = text_to_crawl.translate(translator).split()
+
     # Dictionary to contain frequency of each word in the document
     raw_word_freqs = {
     }
 
-    for word in text_to_crawl:
+    for word in list_words:
         raw_word_freqs[word.lower()] = raw_word_freqs.get(word.lower(), 0) + 1
 
     # Dictionary to contain frequency of each lemma (root word) in the document
@@ -309,6 +310,10 @@ content_type_headers = [
     'content_type',
     'content-type',
 ]
+
+opener = request.build_opener()
+opener.addheaders = [('User-Agent', 'Burnside/1.0')]    
+request.install_opener(opener)
 
 
 def add_link(link, source_id):

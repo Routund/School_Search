@@ -13,7 +13,7 @@
 <body>
     <h1 class = "topBaseBar">
         <a href = "http://localhost:5000/"><img src = "/static/BHS.svg" class = "bhsLogo"></a>
-        {%if username is not none %}
+        {%if username|default(none,true) is not none %}
         <div id="username_section">
             <button id = "username_button" type="button">
                 {{username}}

@@ -8,14 +8,15 @@
 
 
 <div class ="results_search_bar_div">
-    <img src = "/static/magnify.png" class = "result_search_bar_icon">
-    <input type="text" id = "search_bar" value = "{{query}}" class = "results_search_bar" max="100">
+    <img src = "/static/magnify.png" id = "result_search_bar_icon">
+    <input type="text" id = "search_bar" value = "{{query}}" maxlength="100">
+    <img src = "/static/filter.png" id = "filter_search_bar_icon">
 </div>
 <!-- 1: URL, 2: Title, 3: Source, 4:Intro (0 is doc score for ranking)-->
 {% if results | count > 0 %}
  <div id="result_container" data-query = "{{query}}">
     {% for result in results %}
-        <a href = "{{ result[1] }}" class = "result_container" target="_blank">
+        <a href = "{{ result[1] }}" class = "result_container" target="_blank" data-source_id="{{result[3]}}">
             <h2 class = "result_title">{{result[2]}}</h2>
             <h5 class = "result_source">{{result[3]}}</h5>
             <p class = "result_text">{{result[4]}}</p>
@@ -27,6 +28,22 @@
         <img src = "/static/loading.gif" height="50px">
     </div>
 {% else %}
-    No results found!
+    <div id="no_results_text">
+        No results found! Is your search query spelled correctly?
+    </div>
 {% endif %}
+
+<div id="overlay"></div>
+
+<div id="filter_dialogue">
+    <h1 id = "filter_heading">Filter Sources:</h1>
+    <div id="source_grid">
+        {% for source in sources %}
+            <input type="checkbox" name = '{{source}}' data-source = "{{source}}" class="source_checkbox">
+            <label for="{{source}}" class="source_filter_text">{{source}}</label>
+        {% endfor %}
+    </div>
+    <button id="filter_apply">Apply</button>
+</div>
+
 {% endblock %}
