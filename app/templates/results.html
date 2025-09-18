@@ -16,12 +16,12 @@
 {% if results | count > 0 %}
  <div id="result_container" data-query = "{{query}}">
     {% for result in results %}
-        <a href = "{{ result[1] }}" class = "result_container" target="_blank" data-source_id="{{result[3]}}">
+        <a href = "{{ result[1] }}" class = "result_container" target="_blank" data-source="{{result[3]}}">
             <h2 class = "result_title">{{result[2]}}</h2>
             <h5 class = "result_source">{{result[3]}}</h5>
             <p class = "result_text">{{result[4]}}</p>
         </a>    
-        <hr class = "resultDivider">
+        <hr class = "resultDivider" data-source="{{result[3]}}">
     {% endfor %}
  </div>
     <div id = "loading_results">
@@ -39,7 +39,7 @@
     <h1 id = "filter_heading">Filter Sources:</h1>
     <div id="source_grid">
         {% for source in sources %}
-            <input type="checkbox" name = '{{source}}' data-source = "{{source}}" class="source_checkbox">
+            <input type="checkbox" name = '{{source}}' data-source = "{{source}}" class="source_checkbox" checked>
             <label for="{{source}}" class="source_filter_text">{{source}}</label>
         {% endfor %}
     </div>

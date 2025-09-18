@@ -301,10 +301,15 @@ body{
     grid-template-rows: 3;
     display: grid;
     margin-left: 2%;
+    transition: 0.2s;
+    visibility: visible;
 }
 .result_container:visited{
     color: black;
     text-decoration: none;
+}
+.result_container.hide{
+    display: none;
 }
 .result_title{
     font-weight: bold;
@@ -346,7 +351,9 @@ body{
 .resultDivider{
     width: 95%;
     border-color: #275276;
-
+}
+.resultDivider.hide{
+    display: none;
 }
 #result_search_bar_icon{
     width: 70%;

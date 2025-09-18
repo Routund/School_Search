@@ -109,7 +109,7 @@ def okapi_search(query):
 
     # Normalization Parameter
     # Sets how much to boost documents that have a shorter lengthx
-    b = 0.2
+    b = 0.5
 
     dict_words = crawler.index(query.replace('_', ' '))
     n_docs = db.session.query(crawler.models.Document).count()
@@ -130,7 +130,7 @@ def okapi_search(query):
             total_idf += idf
             for doc in connections.all():
                 freq = doc.frequency
-                norm_factor = ((1-b) * b * doc.Document.length/avg_doc_length)
+                norm_factor = ((1-b) + b * doc.Document.length/avg_doc_length)
                 score = idf * freq * (k+1) / ((freq + k) * norm_factor)
                 doc_id = doc.document_id
                 document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score * dict_words[0][lemma]# noqa
@@ -381,6 +381,7 @@ def callback_route():
             "email": email,
             "name": name
         }
+        session['queries'] = {}
 
         user = db.session.query(crawler.models.User).filter_by(email=email).first()
         if not bool(user):

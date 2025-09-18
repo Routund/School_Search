@@ -1,17 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
-var searchBar = document.getElementById("search_bar");
-searchBar.addEventListener("keypress", function(event) {
-    console.debug("AIAIAI")
-    if (event.key === "Enter") {
-        search();
-    }
-    change_filter_list
+    var searchBar = document.getElementById("search_bar");
+    searchBar.addEventListener("keypress", function(event) {
+        if (event.key === "Enter") {
+            search();
+        }
+        change_filter_list
+    });
+    var filter = document.getElementById('filter_search_bar_icon');
+    filter.addEventListener('click', toggle_filter_dialogue);
+    var filter_apply = document.getElementById('filter_apply');
+    filter_apply.addEventListener('click',toggle_filter_dialogue);
 });
-var filter = document.getElementById('filter_search_bar_icon');
-filter.addEventListener('click', toggle_filter_dialogue);
-var filter_apply = document.getElementById('filter_apply');
-filter_apply.addEventListener('click');
-});
+
+var visible = []
 
 function search(){
     const query = document.getElementById("search_bar").value;
@@ -34,6 +35,35 @@ function toggle_filter_dialogue(){
         dialogue_box.classList.add('shown');
     }
     else{
+
+        var source_boxes = document.getElementsByClassName('source_checkbox');
+        visible = []
+        for(let i = 0; i < source_boxes.length; i++){
+             if (!visible.includes(source_boxes[i].dataset.source) && source_boxes[i].checked){
+                visible.push(source_boxes[i].dataset.source);
+             }
+        }
+
+        var results = document.getElementsByClassName("result_container");
+        for(i = 0; i < results.length; i++){
+            if (!visible.includes(results[i].dataset.source)){
+                results[i].classList.add('hide');
+            }
+            else{
+                results[i].classList.remove('hide');
+            }
+        }
+
+        var dividers = document.getElementsByClassName("resultDivider");
+        for(i = 0; i < dividers.length; i++){
+            if (!visible.includes(dividers[i].dataset.source)){
+                dividers[i].classList.add('hide');
+            }
+            else{
+                dividers[i].classList.remove('hide');
+            }
+        }
+
         dimmed = false;
         var overlay = document.getElementById('overlay');
         var dialogue_box = document.getElementById('filter_dialogue');
@@ -83,10 +113,15 @@ $(window).scroll(function() {
                 const divider = document.createElement('hr');
                 divider.setAttribute('class','resultDivider');
 
+                if (!visible.includes('Google Drive')){
+                    divider.classList.add('hide');
+                    anchor.classList.add('hide');
+                }
+
                 anchor.appendChild(title);
                 anchor.appendChild(source_text);
                 anchor.appendChild(preview);
-
+                
                 document.getElementById('result_container').append(anchor);
                 document.getElementById('result_container').appendChild(divider);
             }
