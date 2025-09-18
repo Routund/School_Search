@@ -20,6 +20,9 @@
             </button>
             <div id="top_bar_dropdown-content">
                 <a id="logout_link" href="/logout">Log out</a>
+                {% if admin|default(false,true) %}
+                    <a id="logout_link" href="/admin/documents">Admin</a>
+                {% endif %}
             </div>
         </div>
         {% endif %}

@@ -11,9 +11,7 @@ import easyocr
 from enum import Enum
 from io import BytesIO
 import time
-from pdf2image import convert_from_bytes
 from os import SEEK_END
-from numpy import array
 from pypdf import PdfReader
 
 # need to import wordnet
@@ -312,7 +310,7 @@ content_type_headers = [
 ]
 
 opener = request.build_opener()
-opener.addheaders = [('User-Agent', 'Burnside/1.0')]    
+opener.addheaders = [('User-Agent', 'Burnside/1.0')]
 request.install_opener(opener)
 
 

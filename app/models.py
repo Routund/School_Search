@@ -62,3 +62,4 @@ class User(db.Model):
     user_id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String("50"))
     creds = db.Column(db.String("180"))
+    admin = db.Column(db.Integer)

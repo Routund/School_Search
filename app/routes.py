@@ -4,7 +4,6 @@ from flask import url_for
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from math import log
-from google.oauth2 import id_token
 from google.auth.transport import requests as grequests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -65,13 +64,22 @@ def admin():
     if "user" not in session:
         abort(403)
 
+    if not session['admin']:
+        abort(403)
+    
     # Get list of all current sources
     source_list = db.session.query(crawler.models.Source).all()
     ids = [x.source_id for x in source_list]
     names = [x.name for x in source_list]
     urls = [x.home_url for x in source_list]
 
-    return render_template('admin_documents.html', ids=ids, names=names, urls=urls) # noqa
+    return render_template('admin_documents.html',
+                           ids=ids,
+                           names=names,
+                           urls=urls,
+                           username=session["user"]["name"],
+                           admin=session['admin']
+                           )
 
 
 @app.route('/search/')
@@ -83,7 +91,9 @@ def search_redirecter():
 def search_start():
     if "user" not in session:
         abort(403)
-    return render_template('search.html', username=session["user"]["name"])
+    return render_template('search.html',
+                           username=session["user"]["name"],
+                           admin=session['admin'])
 
 
 # Okapi BM25 search based of Medium article by Emma Park
@@ -134,7 +144,7 @@ def okapi_search(query):
                 score = idf * freq * (k+1) / ((freq + k) * norm_factor)
                 doc_id = doc.document_id
                 document_rankings[doc_id] = document_rankings.get(doc_id, 0) + score * dict_words[0][lemma]# noqa
-    
+
     results = []
     sources = set()
 
@@ -169,7 +179,8 @@ def okapi_search(query):
                            results=results,
                            query=" ".join(query.split('_')),
                            username=session["user"]["name"],
-                           sources=list(sources))
+                           sources=list(sources),
+                           admin=session['admin'])
 
 
 @app.route('/new_source', methods=['POST'])
@@ -391,6 +402,12 @@ def callback_route():
             user.name = name
             user.creds = creds.to_json()
             db.session.commit()
+            session['admin'] = False
+        else:
+            if bool(user.admin):
+                session['admin'] = True
+            else:
+                session['admin'] = False
 
         print(f"Successfully retrieved user info for: {name} ({email})")
         return redirect('/search')
